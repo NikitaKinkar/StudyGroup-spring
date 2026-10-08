@@ -1,0 +1,46 @@
+name: Build and Verify Full Stack
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: study-group-finder/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./study-group-finder
+        run: npm ci
+
+      - name: Build React application
+        working-directory: ./study-group-finder
+        run: npm run build
+
+  build-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build with Maven
+        working-directory: ./study-group-finder-backend
+        run: mvn clean package -DskipTests

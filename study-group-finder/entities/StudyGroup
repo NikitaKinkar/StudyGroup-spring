@@ -1,0 +1,71 @@
+{
+  "name": "StudyGroup",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "course": {
+      "type": "string",
+      "enum": [
+        "CSE(AIML)",
+        "CSE(DS)",
+        "CSE(Cyber)",
+        "ECE",
+        "EEE",
+        "Mechanical",
+        "Civil",
+        "IT",
+        "MBA",
+        "BBA"
+      ]
+    },
+    "description": {
+      "type": "string"
+    },
+    "max_members": {
+      "type": "number",
+      "default": 100
+    },
+    "visibility": {
+      "type": "string",
+      "enum": [
+        "Public",
+        "Private"
+      ],
+      "default": "Public"
+    },
+    "owner_email": {
+      "type": "string"
+    },
+    "owner_name": {
+      "type": "string"
+    },
+    "members": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "Owner",
+              "Member"
+            ],
+            "default": "Member"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "name",
+    "course"
+  ]
+}

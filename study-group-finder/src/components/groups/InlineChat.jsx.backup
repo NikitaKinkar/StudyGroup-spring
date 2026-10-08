@@ -1,0 +1,1229 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, Send, MessageCircle, Edit2, Trash2, Paperclip, X, MoreVertical, Download, Eye, Reply, Search, Info, Smile, Heart, Hand, PawPrint, Utensils, Trophy, Package, Star } from 'lucide-react';
+import websocketService from '../../services/websocketService';
+import chatService from '../../services/chatService';
+
+const InlineChat = ({ group, user, onClose, isInLayout = false, isCourseChat = false, courseInfo = null }) => {
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [isConnected, setIsConnected] = useState(true); // Always online for demo
+  const [loading, setLoading] = useState(true);
+  const [editingMessage, setEditingMessage] = useState(null);
+  const [editText, setEditText] = useState('');
+  const [showFileUpload, setShowFileUpload] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [activeMenu, setActiveMenu] = useState(null);
+  const [selectedMessages, setSelectedMessages] = useState(new Set());
+  const [showDeleteOptions, setShowDeleteOptions] = useState(false);
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [userProfiles, setUserProfiles] = useState(new Map());
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [selectedEmojiCategory, setSelectedEmojiCategory] = useState('Smileys');
+  const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const emojiPickerRef = useRef(null);
+
+  // Categorized emojis with icons
+  const emojiCategories = {
+    'Smileys': { icon: Smile, emojis: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '😋', '😛', '😜', '🤪', '😝', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '😎', '🤓', '🧐'] },
+    'Faces': { icon: MessageCircle, emojis: ['😕', '😟', '🙁', '☹️', '😮', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤', '😡', '😠', '🤬', '😈', '👿', '💀', '☠️', '💩', '🤡', '👹', '👺', '👻', '👽', '👾', '🤖'] },
+    'Hearts': { icon: Heart, emojis: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝'] },
+    'Hands': { icon: Hand, emojis: ['👍', '👎', '👌', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '👇', '☝️', '✋', '🤚', '🖐️', '👋', '🤏', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '💪', '🦾', '🦿', '🦵'] },
+    'Animals': { icon: PawPrint, emojis: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐽', '🐸', '🐵', '🙈', '🙉', '🙊', '🐒', '🐔', '🐧', '🐦', '🐤', '🐣', '🐥', '🦆', '🦅', '🦉', '🦇', '🐺', '🐗', '🐴', '🦄', '🐝', '🐛', '🦋', '🐌', '🐞', '🐜', '🦟', '🦗', '🕷️', '🕸️', '🦂', '🐢', '🐍', '🦎', '🦖', '🦕', '🐙', '🦑', '🦐', '🦞', '🦀', '🐡', '🐠', '🐟', '🐬', '🐳', '🐋', '🦈'] },
+    'Food': { icon: Utensils, emojis: ['🍏', '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🍆', '🥑', '🥦', '🥬', '🥒', '🌶️', '🌽', '🥕', '🥔', '🍠', '🥐', '🍞', '🥖', '🥨', '🧀', '🥚', '🍳', '🥞', '🥓', '🥩', '🍗', '🍖', '🌭', '🍔', '🍟', '🍕', '🥪', '🥙', '🌮', '🌯', '🥗', '🥘', '🥫', '🍝', '🍜', '🍲', '🍛', '🍣', '🍱', '🥟', '🍤', '🍙', '🍚', '🍘', '🍥', '🥠', '🥮', '🍢', '🍡', '🍧', '🍨', '🍦', '🥧', '🧁', '🍰', '🎂', '🍮', '🍭', '🍬', '🍫', '🍿', '🍩', '🍪', '🌰', '🥜', '🍯', '🥛', '🍼', '☕', '🍵', '🥤', '🍶', '🍺', '🍻', '🥂', '🍷', '🥃', '🍸', '🍹', '🍾'] },
+    'Activities': { icon: Trophy, emojis: ['⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎱', '🏓', '🏸', '🏒', '🏑', '🥍', '🏏', '🥅', '⛳', '🏹', '🎣', '🤿', '🥊', '🥋', '🎽', '🛹', '🛷', '⛸️', '🥌', '🎿', '⛷️', '🏂', '🏋️', '🤼', '🤸', '🤺', '🤾', '🏌️', '🏇', '🧘', '🏄', '🏊', '🤽', '🚣', '🧗', '🚴', '🚵', '🎪', '🎭', '🎨', '🎬', '🎤', '🎧', '🎼', '🎹', '🥁', '🎷', '🎺', '🎸', '🪕', '🎻', '🎲', '♟️', '🎯', '🎳', '🎮', '🎰', '🧩'] },
+    'Objects': { icon: Package, emojis: ['🚗', '🚕', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑', '🚒', '🚐', '🛻', '🚚', '🚛', '🚜', '🏍️', '🛵', '🚲', '🛴', '🛹', '🛼', '🚁', '🛸', '✈️', '🛩️', '🚀', '🛰️', '🚢', '⚓', '🚂', '🚆', '🚄', '🚅', '🚈', '🚝', '🚞', '🚋', '🚌', '🚎', '🚐', '🚑', '🚒', '🚓', '🚔', '🚕', '🚖', '🚗', '🚘', '🚙', '🛻', '🚚', '🚛', '🚜', '🏎️', '🏍️', '🛵', '🦽', '🦼', '🛺', '🚍', '🚎', '🚐', '🚑', '🚒', '🚓', '🚔', '🚕', '🚖', '🚗', '🚘', '🚙', '🛻', '🚚', '🚛', '🚜', '🏎️', '🏍️', '🛵', '🦽', '🦼', '🛺', '🚍', '🚎', '🚐', '🚑', '🚒', '🚓', '🚔', '🚕', '🚖', '🚗', '🚘', '🚙', '🛻', '🚚', '🚛', '🚜'] },
+    'Symbols': { icon: Star, emojis: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '✨', '💫', '⭐', '🌟', '⚡', '🔥', '💥', '💢', '🌈', '☀️', '🌤️', '⛅', '🌥️', '☁️', '🌦️', '🌧️', '⛈️', '🌩️', '🌨️', '❄️', '☃️', '⛄', '🌬️', '💨', '🌪️', '🌫️', '🌊', '💧', '💦', '☔', '🌡️', '🌱', '🌿', '🍀', '🌾', '🌵', '🌲', '🌳', '🌴', '🌈', '🌅', '🌄', '🌠', '🎆', '🎇', '✨', '💫', '⭐', '🌟', '⚡', '🔥', '💥', '💢', '🌈'] }
+  };
+
+  // Flatten for simple usage
+  const commonEmojis = Object.values(emojiCategories).flatMap(category => category.emojis);
+
+  // Function to load group member profiles
+  const loadGroupMemberProfiles = () => {
+    if (!group || !user) return;
+    
+    // Get all users from localStorage
+    const users = JSON.parse(localStorage.getItem("studyconnect_users") || "[]");
+    const newProfiles = new Map();
+    
+    // Add current user - prioritize fullName
+    if (user.email) {
+      const fullName = user.fullName || user.name || user.email.split('@')[0] || 'User';
+      newProfiles.set(user.email, fullName);
+    }
+    
+    // Add group members - prioritize fullName
+    (group.members || []).forEach(member => {
+      const memberUser = users.find(u => u.email === member.email);
+      if (memberUser) {
+        // Always prioritize fullName over everything else
+        const fullName = memberUser.fullName || memberUser.name || member.email.split('@')[0] || 'User';
+        newProfiles.set(member.email, fullName);
+      } else {
+        // Fallback to member fullName or name or email username
+        const fullName = member.fullName || member.name || member.email.split('@')[0] || 'User';
+        newProfiles.set(member.email, fullName);
+      }
+    });
+    
+    // Add group owner - prioritize fullName
+    if (group.owner_email) {
+      const ownerUser = users.find(u => u.email === group.owner_email);
+      if (ownerUser) {
+        // Always prioritize fullName over everything else
+        const fullName = ownerUser.fullName || ownerUser.name || group.owner_email.split('@')[0] || 'User';
+        newProfiles.set(group.owner_email, fullName);
+      } else {
+        // Fallback to email username
+        const fullName = group.owner_email.split('@')[0] || 'User';
+        newProfiles.set(group.owner_email, fullName);
+      }
+    }
+    
+    setUserProfiles(newProfiles);
+  };
+
+  // Function to get current profile name for a user
+  const getCurrentProfileName = (userEmail) => {
+    // Special override for your email to force M.Dinesh
+    if (userEmail === 'dineshmatti707@gmail.com') {
+      return 'M.Dinesh';
+    }
+    
+    // Special override for chethan707 email to force full name
+    if (userEmail === 'chethan707@gmail.com') {
+      return 'Chethan Kumar';
+    }
+    
+    // Always check localStorage first for most up-to-date data
+    const users = JSON.parse(localStorage.getItem("studyconnect_users") || "[]");
+    
+    // Check if this is the current user first
+    if (user && user.email === userEmail) {
+      // Force return fullName if available, otherwise name, then username
+      if (user.fullName) {
+        return user.fullName;
+      }
+      if (user.name) {
+        return user.name;
+      }
+      return userEmail.split('@')[0] || 'User';
+    }
+    
+    // Find user in localStorage
+    const foundUser = users.find(u => u.email === userEmail);
+    if (foundUser) {
+      // Force return fullName if available, otherwise name, then username
+      if (foundUser.fullName) {
+        return foundUser.fullName;
+      }
+      if (foundUser.name) {
+        return foundUser.name;
+      }
+      return userEmail.split('@')[0] || 'User';
+    }
+    
+    // Check if it's a group owner
+    if (group && group.owner_email === userEmail) {
+      const ownerUser = users.find(u => u.email === userEmail);
+      if (ownerUser && ownerUser.fullName) {
+        return ownerUser.fullName;
+      }
+      if (ownerUser && ownerUser.name) {
+        return ownerUser.name;
+      }
+      return userEmail.split('@')[0] || 'User';
+    }
+    
+    // Check if it's a group member
+    if (group && group.members) {
+      const member = group.members.find(m => m.email === userEmail);
+      if (member) {
+        const memberUser = users.find(u => u.email === userEmail);
+        if (memberUser && memberUser.fullName) {
+          return memberUser.fullName;
+        }
+        if (memberUser && memberUser.name) {
+          return memberUser.name;
+        }
+        return member.fullName || member.name || userEmail.split('@')[0] || 'User';
+      }
+    }
+    
+    // Last resort - return username part of email
+    return userEmail.split('@')[0] || 'User';
+  };
+
+  // Function to refresh all user profiles
+  const refreshUserProfiles = () => {
+    const users = JSON.parse(localStorage.getItem("studyconnect_users") || "[]");
+    const newProfiles = new Map();
+    
+    users.forEach(u => {
+      // Always prioritize fullName over everything else
+      const fullName = u.fullName || u.name || u.email.split('@')[0] || 'User';
+      newProfiles.set(u.email, fullName);
+    });
+    
+    // Add current user if not in list - prioritize fullName
+    if (user && !newProfiles.has(user.email)) {
+      const fullName = user.fullName || user.name || user.email.split('@')[0] || 'User';
+      newProfiles.set(user.email, fullName);
+    }
+    
+    setUserProfiles(newProfiles);
+  };
+
+  // Listen for profile changes
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === "studyconnect_users") {
+        refreshUserProfiles();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+
+  // Load profiles on component mount and when group/user changes
+  useEffect(() => {
+    if (user && group) {
+      loadGroupMemberProfiles();
+      refreshUserProfiles();
+    }
+  }, [user, group]);
+
+  useEffect(() => {
+    if (!group || !user) return;
+
+    // Load group member profiles
+    loadGroupMemberProfiles();
+
+    // Fetch chat history
+    const fetchChatHistory = async () => {
+      try {
+        const groupChatKey = `studyconnect_group_chat_${group.id}`;
+        const savedMessages = JSON.parse(localStorage.getItem(groupChatKey) || "[]");
+        setMessages(savedMessages);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching chat history:', error);
+        setLoading(false);
+      }
+    };
+
+    fetchChatHistory();
+    
+    // Start listening for real-time messages
+    const cleanup = listenForGroupMessages();
+    
+    setIsConnected(true);
+
+    return () => {
+      websocketService.disconnect();
+      setIsConnected(false);
+      cleanup();
+    };
+  }, [group, user]);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (activeMenu && !event.target.closest('.message-menu') && !event.target.closest('.more-vertical-btn')) {
+        setActiveMenu(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [activeMenu]);
+
+  const handleNewMessage = (message) => {
+    setMessages(prev => [...prev, message]);
+  };
+
+  const handleEditMessage = (messageId) => {
+    const message = messages.find(m => m.id === messageId);
+    if (message && message.senderEmail === user.email) {
+      setEditingMessage(messageId);
+      setEditText(message.content);
+    }
+  };
+
+  const handleSaveEdit = () => {
+    if (editingMessage !== null && editText.trim()) {
+      const updatedMessage = {
+        ...messages.find(m => m.id === editingMessage),
+        content: editText.trim(),
+        edited: true,
+        editedAt: new Date().toISOString()
+      };
+      
+      // Update message in local state
+      setMessages(prev => prev.map(msg => 
+        msg.id === editingMessage 
+          ? updatedMessage
+          : msg
+      ));
+      
+      // Broadcast edited message to all group members
+      broadcastMessageToGroup(updatedMessage);
+      
+      // Clear edit state
+      setEditingMessage(null);
+      setEditText('');
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessage(null);
+    setEditText('');
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedMessages.size === 0) return;
+    
+    if (confirm(`Are you sure you want to delete ${selectedMessages.size} message(s)?`)) {
+      const messageIds = Array.from(selectedMessages);
+      
+      // Remove from local state
+      setMessages(prev => prev.filter(msg => !messageIds.includes(msg.id)));
+      
+      // Remove from localStorage (permanent deletion)
+      const groupChatKey = `studyconnect_group_chat_${group.id}`;
+      const existingMessages = JSON.parse(localStorage.getItem(groupChatKey) || "[]");
+      const updatedMessages = existingMessages.filter(msg => !messageIds.includes(msg.id));
+      localStorage.setItem(groupChatKey, JSON.stringify(updatedMessages));
+      
+      // Broadcast each deletion to all group members
+      messageIds.forEach(messageId => {
+        const timestamp = Date.now() + Math.random();
+        localStorage.setItem(`studyconnect_group_broadcast_${group.id}_${timestamp}`, JSON.stringify({
+          groupId: group.id,
+          messageId: messageId,
+          action: 'delete',
+          timestamp: timestamp
+        }));
+        
+        // Clean up broadcast event
+        setTimeout(() => {
+          localStorage.removeItem(`studyconnect_group_broadcast_${group.id}_${timestamp}`);
+        }, 100);
+      });
+      
+      // Clear selection
+      setSelectedMessages(new Set());
+      setShowDeleteOptions(false);
+    }
+  };
+
+  const handleDeleteMessage = (messageId) => {
+    if (confirm('Are you sure you want to delete this message?')) {
+      // Remove from local state
+      setMessages(prev => prev.filter(msg => msg.id !== messageId));
+      
+      // Remove from localStorage (permanent deletion)
+      const groupChatKey = `studyconnect_group_chat_${group.id}`;
+      const existingMessages = JSON.parse(localStorage.getItem(groupChatKey) || "[]");
+      const updatedMessages = existingMessages.filter(msg => msg.id !== messageId);
+      localStorage.setItem(groupChatKey, JSON.stringify(updatedMessages));
+      
+      // Broadcast deletion to all group members
+      const timestamp = Date.now();
+      localStorage.setItem(`studyconnect_group_broadcast_${group.id}_${timestamp}`, JSON.stringify({
+        groupId: group.id,
+        messageId: messageId,
+        action: 'delete',
+        timestamp: timestamp
+      }));
+      
+      // Clean up broadcast event
+      setTimeout(() => {
+        localStorage.removeItem(`studyconnect_group_broadcast_${group.id}_${timestamp}`);
+      }, 100);
+    }
+  };
+
+  const handleFileSelect = (e) => {
+    const files = Array.from(e.target.files);
+    setSelectedFiles(prev => [...prev, ...files]);
+  };
+
+  const handleRemoveFile = (index) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSendFiles = () => {
+    if (selectedFiles.length > 0) {
+      selectedFiles.forEach(file => {
+        // Convert file to base64 for sharing
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64Data = e.target.result;
+          
+          const fileMessage = {
+            id: Date.now() + Math.random(),
+            senderEmail: user.email, // Only store user ID
+            content: `📎 Shared ${file.name}`,
+            timestamp: new Date().toISOString(),
+            type: 'file',
+            fileName: file.name,
+            fileSize: file.size,
+            fileType: file.type,
+            fileData: base64Data // Store base64 data for sharing
+          };
+          
+          // Add file message to local state
+          setMessages(prev => [...prev, fileMessage]);
+          
+          // Broadcast file message to all group members
+          broadcastMessageToGroup(fileMessage);
+          
+          // Create notifications for other group members
+          const groupMembers = group.members || [];
+          groupMembers.forEach(member => {
+            if (member.email !== user.email) {
+              createChatNotification(fileMessage, member.email);
+            }
+          });
+        };
+        reader.readAsDataURL(file);
+      });
+      setSelectedFiles([]);
+      setShowFileUpload(false);
+    }
+  };
+
+  const handlePreviewFile = (fileMessage) => {
+    let fileUrl;
+    
+    // Handle both blob URLs and base64 data
+    if (fileMessage.fileData) {
+      // Create blob URL from base64 data
+      const byteCharacters = atob(fileMessage.fileData.split(',')[1]);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: fileMessage.fileType });
+      fileUrl = URL.createObjectURL(blob);
+    } else if (fileMessage.fileUrl) {
+      // Use existing blob URL
+      fileUrl = fileMessage.fileUrl;
+    } else {
+      console.error('No file data available for preview');
+      return;
+    }
+    
+    if (fileMessage.fileType && fileMessage.fileType.startsWith('image/')) {
+      // For images, open in new tab with full viewer
+      const newWindow = window.open('', '_blank');
+      newWindow.document.write(`
+        <html>
+          <head>
+            <title>${fileMessage.fileName}</title>
+            <style>
+              body { margin:0; padding:20px; display:flex; justify-content:center; align-items:center; min-height:100vh; background:#f5f5f5; }
+              img { max-width:100%; max-height:100%; object-fit:contain; box-shadow:0 4px 6px rgba(0,0,0,0.1); border-radius:8px; }
+            </style>
+          </head>
+          <body>
+            <img src="${fileUrl}" alt="${fileMessage.fileName}" />
+          </body>
+        </html>
+      `);
+    } else if (fileMessage.fileType && fileMessage.fileType.startsWith('video/')) {
+      // For videos, open in new tab with video player
+      const newWindow = window.open('', '_blank');
+      newWindow.document.write(`
+        <html>
+          <head>
+            <title>${fileMessage.fileName}</title>
+            <style>
+              body { margin:0; padding:20px; display:flex; justify-content:center; align-items:center; min-height:100vh; background:#f5f5f5; }
+              video { max-width:100%; max-height:100%; box-shadow:0 4px 6px rgba(0,0,0,0.1); border-radius:8px; }
+            </style>
+          </head>
+          <body>
+            <video controls autoplay>
+              <source src="${fileUrl}" type="${fileMessage.fileType}">
+                Your browser does not support the video tag.
+              </video>
+          </body>
+        </html>
+      `);
+    } else if (fileMessage.fileType && fileMessage.fileType.includes('pdf')) {
+      // For PDFs, open in new tab
+      const newWindow = window.open('', '_blank');
+      newWindow.document.write(`
+        <html>
+          <head>
+            <title>${fileMessage.fileName}</title>
+            <style>
+              body { margin:0; padding:20px; background:#f5f5f5; }
+              iframe { width:100%; height:90vh; border:none; box-shadow:0 4px 6px rgba(0,0,0,0.1); border-radius:8px; }
+            </style>
+          </head>
+          <body>
+            <iframe src="${fileUrl}" type="application/pdf"></iframe>
+          </body>
+        </html>
+      `);
+    } else if (fileMessage.fileType && (fileMessage.fileType.includes('text') || fileMessage.fileType.includes('document'))) {
+      // For text files and documents, show in new tab
+      fetch(fileUrl)
+        .then(response => response.text())
+        .then(text => {
+          const newWindow = window.open('', '_blank');
+          newWindow.document.write(`
+            <html>
+              <head>
+                <title>${fileMessage.fileName}</title>
+                <style>
+                  body { margin:0; padding:20px; font-family:monospace; background:#f5f5f5; white-space:pre-wrap; }
+                  pre { background:white; padding:20px; border-radius:8px; box-shadow:0 4px 6px rgba(0,0,0,0.1); }
+                </style>
+              </head>
+              <body>
+                <pre>${text}</pre>
+              </body>
+            </html>
+          `);
+        })
+        .catch(error => {
+          console.error('Error loading file:', error);
+          // Fallback to download
+          handleDownloadFile(fileMessage);
+        });
+    } else {
+      // For other files, show file info and download
+      const newWindow = window.open('', '_blank');
+      newWindow.document.write(`
+        <html>
+          <head>
+            <title>${fileMessage.fileName}</title>
+            <style>
+              body { margin:0; padding:40px; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; background:#f5f5f5; font-family:Arial, sans-serif; }
+              .file-info { background:white; padding:30px; border-radius:12px; box-shadow:0 4px 6px rgba(0,0,0,0.1); text-align:center; max-width:400px; }
+              .file-icon { font-size:48px; margin-bottom:20px; color:#6b7280; }
+              .file-name { font-size:18px; font-weight:bold; margin-bottom:10px; color:#1f2937; }
+              .file-size { font-size:14px; color:#6b7280; margin-bottom:20px; }
+              .download-btn { background:#10b981; color:white; padding:12px 24px; border:none; border-radius:8px; cursor:pointer; font-size:16px; }
+              .download-btn:hover { background:#059669; }
+            </style>
+          </head>
+          <body>
+            <div class="file-info">
+              <div class="file-icon">📄</div>
+              <div class="file-name">${fileMessage.fileName}</div>
+              <div class="file-size">${(fileMessage.fileSize / 1024).toFixed(1)} KB</div>
+              <button class="download-btn" onclick="window.close();">
+                Download File
+              </button>
+            </div>
+          </body>
+        </html>
+      `);
+    }
+    
+    // Clean up the blob URL after a delay
+    if (fileMessage.fileData) {
+      setTimeout(() => {
+        URL.revokeObjectURL(fileUrl);
+      }, 5000); // Give 5 seconds for preview to load
+    }
+  };
+
+  const handleDownloadFile = (fileMessage) => {
+    try {
+      let fileUrl;
+      
+      // Handle both blob URLs and base64 data
+      if (fileMessage.fileData) {
+        // Create blob URL from base64 data
+        const byteCharacters = atob(fileMessage.fileData.split(',')[1]);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: fileMessage.fileType });
+        fileUrl = URL.createObjectURL(blob);
+      } else if (fileMessage.fileUrl) {
+        // Use existing blob URL
+        fileUrl = fileMessage.fileUrl;
+      } else {
+        console.error('No file data available for download');
+        return;
+      }
+      
+      // Create download link with correct file
+      const link = document.createElement('a');
+      link.href = fileUrl;
+      link.download = fileMessage.fileName;
+      link.style.display = 'none';
+      
+      // Add to DOM, trigger download, and cleanup
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up URL after download (delayed to allow download to complete)
+      setTimeout(() => {
+        URL.revokeObjectURL(fileUrl);
+      }, 1000);
+      
+      // Show success feedback
+      console.log(`Downloaded: ${fileMessage.fileName}`);
+    } catch (error) {
+      console.error('Download failed:', error);
+      // Fallback: open file in new tab
+      if (fileMessage.fileData) {
+        const newWindow = window.open('', '_blank');
+        newWindow.document.write(`
+          <html>
+            <head><title>${fileMessage.fileName}</title></head>
+            <body style="margin:0; padding:20px; text-align:center;">
+              <p>Download failed. Please try right-clicking and saving the file.</p>
+              <p>File: ${fileMessage.fileName}</p>
+              <p>Size: ${(fileMessage.fileSize / 1024).toFixed(1)} KB</p>
+            </body>
+          </html>
+        `);
+      }
+    }
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleSendMessage = (e) => {
+    e.preventDefault();
+    if (newMessage.trim() && isConnected && group && user) {
+      const message = {
+        id: Date.now() + Math.random(),
+        senderEmail: user.email, // Only store user ID
+        content: newMessage.trim(),
+        timestamp: new Date().toISOString(),
+        type: 'text',
+        replyTo: replyingTo ? {
+          id: replyingTo.id,
+          content: replyingTo.content,
+          senderEmail: replyingTo.senderEmail // Only store user ID
+        } : null
+      };
+      
+      // Add message to local state
+      setMessages(prev => [...prev, message]);
+      
+      // Broadcast message to all group members
+      broadcastMessageToGroup(message);
+      
+      // Create notifications for other group members
+      const groupMembers = group.members || [];
+      groupMembers.forEach(member => {
+        if (member.email !== user.email) {
+          createChatNotification(message, member.email);
+        }
+      });
+      
+      // Clear input and reply
+      setNewMessage('');
+      setReplyingTo(null);
+      inputRef.current?.focus();
+    }
+  };
+
+  const broadcastMessageToGroup = (message) => {
+  // Store message in group chat history
+  const groupChatKey = `studyconnect_group_chat_${group.id}`;
+  const existingMessages = JSON.parse(localStorage.getItem(groupChatKey) || "[]");
+  
+  // Check if this is an edited message
+  if (message.edited) {
+    // Find and update existing message
+    const messageIndex = existingMessages.findIndex(msg => msg.id === message.id);
+    if (messageIndex !== -1) {
+      existingMessages[messageIndex] = message;
+    } else {
+      // If not found, add as new message
+      existingMessages.push(message);
+    }
+  } else {
+    // Add new message
+    existingMessages.push(message);
+  }
+  
+  localStorage.setItem(groupChatKey, JSON.stringify(existingMessages));
+  
+  // Trigger storage event for other tabs/windows
+  const timestamp = Date.now();
+  localStorage.setItem(`studyconnect_group_broadcast_${group.id}_${timestamp}`, JSON.stringify({
+    groupId: group.id,
+    message: message,
+    timestamp: timestamp,
+    isEdit: message.edited || false
+  }));
+  
+  // Clean up old broadcast events
+  setTimeout(() => {
+    localStorage.removeItem(`studyconnect_group_broadcast_${group.id}_${timestamp}`);
+  }, 100);
+};
+
+  const listenForGroupMessages = () => {
+    const handleStorageChange = (e) => {
+      if (e.key && e.key.startsWith('studyconnect_group_broadcast_')) {
+        try {
+          const broadcastData = JSON.parse(e.newValue);
+          if (broadcastData.groupId === group.id) {
+            const message = broadcastData.message;
+            const isEdit = broadcastData.isEdit || false;
+            const action = broadcastData.action;
+            
+            // Handle message deletion
+            if (action === 'delete') {
+              const messageId = broadcastData.messageId;
+              setMessages(prev => prev.filter(msg => msg.id !== messageId));
+              return;
+            }
+            
+            // Only add message if it's not from current user
+            if (message.senderEmail !== user?.email) {
+              setMessages(prev => {
+                if (isEdit) {
+                  // Update existing message in place
+                  return prev.map(msg => 
+                    msg.id === message.id 
+                      ? message
+                      : msg
+                  );
+                } else {
+                  // Add new message
+                  const messageExists = prev.some(msg => msg.id === message.id);
+                  if (!messageExists) {
+                    return [...prev, message];
+                  }
+                  return prev;
+                }
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Error parsing broadcast message:', error);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  };
+
+  const handleClearChat = () => {
+    if (confirm('Are you sure you want to clear all messages?')) {
+      setMessages([]);
+    }
+  };
+
+  const handleSelectMessage = (messageId) => {
+    const newSelected = new Set(selectedMessages);
+    if (newSelected.has(messageId)) {
+      newSelected.delete(messageId);
+    } else {
+      newSelected.add(messageId);
+    }
+    setSelectedMessages(newSelected);
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedMessages.size > 0 && confirm(`Delete ${selectedMessages.size} messages?`)) {
+      setMessages(prev => prev.filter(msg => !selectedMessages.has(msg.id)));
+      setSelectedMessages(new Set());
+      setShowDeleteOptions(false);
+    }
+  };
+
+  const handleReply = (message) => {
+    setReplyingTo(message);
+    inputRef.current?.focus();
+  };
+
+  const handleCancelReply = () => {
+    setReplyingTo(null);
+  };
+
+  const createChatNotification = (message, recipientEmail) => {
+    const notifications = JSON.parse(localStorage.getItem("studyconnect_notifications") || "[]");
+    const notification = {
+      id: Date.now().toString(),
+      type: 'chat_message',
+      sender_email: user.email,
+      recipient_email: recipientEmail,
+      group_id: group.id,
+      group_name: group.name,
+      message: message.content,
+      sender_name: user.fullName || user.name,
+      timestamp: new Date().toISOString(),
+      read: false
+    };
+    notifications.push(notification);
+    localStorage.setItem("studyconnect_notifications", JSON.stringify(notifications));
+  };
+
+  const formatTimestamp = (timestamp) => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  // Emoji handling functions
+  const handleEmojiClick = (emoji) => {
+    setNewMessage(prev => prev + emoji);
+    setShowEmojiPicker(false);
+    inputRef.current?.focus();
+  };
+
+  const toggleEmojiPicker = () => {
+    setShowEmojiPicker(!showEmojiPicker);
+  };
+
+  // Close emoji picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target)) {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  if (!group || !user) return null;
+
+  return (
+    <div className={`${isInLayout ? 'h-full' : 'fixed inset-0'} bg-white z-50 flex flex-col`}>
+      {/* Header */}
+      <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-4 py-3 flex items-center justify-between shadow-lg">
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-orange-700 rounded-lg transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5 text-white" />
+          </button>
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-white font-bold">
+              {isCourseChat ? '📚' : (group.name?.charAt(0)?.toUpperCase() || 'G')}
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-white">
+                {isCourseChat ? courseInfo?.name || 'Course Chat' : group.name}
+              </h2>
+              <p className="text-xs text-orange-100">
+                {isCourseChat 
+                  ? `${courseInfo?.courseCode || 'COURSE'} • ${courseInfo?.enrolledStudents?.length || 0} students`
+                  : `${group.course} • ${(group.members || []).length + 1} members`
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex items-center space-x-3">
+          <button className="p-2 hover:bg-orange-700 rounded-lg transition-colors">
+            <Info className="w-5 h-5 text-white" />
+          </button>
+        </div>
+      </div>
+
+      {/* Search Bar */}
+      <div className="bg-white border-b border-gray-200 px-4 py-2">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search messages..."
+            className="w-full pl-10 pr-4 py-2 bg-gray-100 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+          />
+        </div>
+      </div>
+
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto bg-gray-50 px-4 py-4">
+        {showDeleteOptions && selectedMessages.size > 0 && (
+          <div className="mb-4 p-3 bg-orange-100 rounded-lg flex items-center justify-between">
+            <span className="text-sm text-orange-800">
+              {selectedMessages.size} messages selected
+            </span>
+            <button
+              onClick={handleBulkDelete}
+              className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600"
+            >
+              Delete Selected
+            </button>
+          </div>
+        )}
+        
+        {loading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading messages...</p>
+            </div>
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center text-orange-500 mx-auto mb-4">
+                <MessageCircle className="w-8 h-8" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No messages yet</h3>
+              <p className="text-gray-600">Start the conversation!</p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`flex ${
+                  message.senderEmail === user?.email ? 'justify-end' : 'justify-start'
+                }`}
+              >
+                {/* Profile name outside message box for all users */}
+                <div className={`mb-2 text-sm font-medium ${
+                  message.senderEmail === user?.email ? 'text-right' : 'text-left'
+                }`}>
+                  {getCurrentProfileName(message.senderEmail)}
+                </div>
+                
+                <div className={`max-w-xs lg:max-w-md rounded-2xl px-4 py-2 relative ${
+                  message.senderEmail === user?.email 
+                    ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' 
+                    : 'bg-white text-gray-900 border border-gray-200'
+                }`}>
+                  {showDeleteOptions && (
+                    <input
+                      type="checkbox"
+                      checked={selectedMessages.has(message.id)}
+                      onChange={() => handleSelectMessage(message.id)}
+                      className="absolute top-2 left-2 w-4 h-4"
+                    />
+                  )}
+                  
+                  {/* Only show avatar for other users */}
+                  {message.senderEmail !== user?.email && (
+                    <div className="flex items-center space-x-2 mb-1">
+                      <div className="w-8 h-8 bg-gray-800 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                        {getCurrentProfileName(message.senderEmail)?.charAt(0)?.toUpperCase() || 'U'}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {message.senderEmail === user?.email && (
+                    <div className="flex items-center justify-end mb-1">
+                    </div>
+                  )}
+                  
+                  {/* Message content with three dots */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      {message.replyTo && (
+                        <div className="mb-2 p-2 bg-white/10 rounded-lg border-l-2 border-orange-300">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <Reply className="w-3 h-3 text-orange-200" />
+                            <span className="text-xs text-orange-200">Replying to {getCurrentProfileName(message.replyTo.senderEmail)}</span>
+                          </div>
+                          <p className="text-xs text-orange-100 italic">{message.replyTo.content}</p>
+                        </div>
+                      )}
+                      
+                      {message.type === 'file' ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <Paperclip className="w-4 h-4" />
+                            <div className="flex-1">
+                              <p className="text-sm font-medium">{message.fileName}</p>
+                              <p className="text-xs opacity-75">{(message.fileSize / 1024).toFixed(1)} KB</p>
+                            </div>
+                          </div>
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => handlePreviewFile(message)}
+                              className="text-xs bg-orange-500 text-white px-2 py-1 rounded flex items-center gap-1 hover:bg-orange-600 transition-colors"
+                            >
+                              <Eye className="w-3 h-3" /> Preview
+                            </button>
+                            <button
+                              onClick={() => handleDownloadFile(message)}
+                              className="text-xs bg-green-500 text-white px-2 py-1 rounded flex items-center gap-1"
+                            >
+                              <Download className="w-3 h-3" /> Download
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Three dots positioned on the right side of text */}
+                    {(message.senderEmail === user?.email || message.senderEmail !== user?.email) && !showDeleteOptions && (
+                      <div className="ml-2">
+                        <button
+                          onClick={() => setActiveMenu(activeMenu === message.id ? null : message.id)}
+                          className="p-2 hover:bg-white/20 rounded-lg transition-all duration-200"
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
+                        {activeMenu === message.id && (
+                          <div className="message-menu absolute right-0 bottom-10 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10 min-w-[120px]">
+                          <button
+                            onClick={() => {
+                              handleReply(message);
+                              setActiveMenu(null);
+                            }}
+                            className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                          >
+                            <Reply className="w-3 h-3" />
+                            <span>Reply</span>
+                          </button>
+                          {message.senderEmail === user?.email ? (
+                            <button
+                              onClick={() => {
+                                handleEditMessage(message.id);
+                                setActiveMenu(null);
+                              }}
+                              className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                              <span>Edit</span>
+                            </button>
+                          ) : (
+                            <></>
+                          )}
+                          <button
+                            onClick={() => {
+                              handleDeleteMessage(message.id);
+                              setActiveMenu(null);
+                            }}
+                            className="flex items-center space-x-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Delete</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                      {activeMenu === message.id && (
+                        <div className="message-menu absolute right-0 bottom-10 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10 min-w-[120px]">
+                          <button
+                            onClick={() => {
+                              handleReply(message);
+                              setActiveMenu(null);
+                            }}
+                            className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                          >
+                            <Reply className="w-3 h-3" />
+                            <span>Reply</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              handleDeleteMessage(message.id);
+                              setActiveMenu(null);
+                            }}
+                            className="flex items-center space-x-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Delete</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+      </div>
+
+      {/* Message Input */}
+      <div className="bg-white border-t border-gray-200 px-4 py-3 shadow-lg">
+        {replyingTo && (
+          <div className="mb-2 p-2 bg-orange-50 rounded-lg border border-orange-200">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center space-x-2">
+                <Reply className="w-3 h-3 text-orange-500" />
+                <span className="text-xs font-medium text-orange-800">Replying to {getCurrentProfileName(replyingTo.senderEmail)}</span>
+              </div>
+              <button
+                onClick={handleCancelReply}
+                className="text-orange-500 hover:text-orange-700"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+            <p className="text-xs text-orange-700 italic">{replyingTo.content}</p>
+          </div>
+        )}
+        
+        <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
+          <button
+            type="button"
+            onClick={() => setShowFileUpload(true)}
+            className="p-2 text-gray-500 hover:text-orange-500 transition-colors"
+          >
+            <Paperclip className="w-5 h-5" />
+          </button>
+          
+          <div className="relative" ref={emojiPickerRef}>
+            <button
+              type="button"
+              onClick={toggleEmojiPicker}
+              className="p-2 text-gray-500 hover:text-orange-500 transition-colors"
+            >
+              <Smile className="w-5 h-5" />
+            </button>
+            
+            {showEmojiPicker && (
+              <div className="absolute bottom-full mb-2 left-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50" style={{ width: '320px', maxHeight: '320px' }}>
+                {/* Category Tabs with Icons */}
+                <div className="flex flex-wrap border-b border-gray-200 p-1">
+                  {Object.entries(emojiCategories).map(([category, data]) => {
+                    const Icon = data.icon;
+                    return (
+                      <button
+                        key={category}
+                        onClick={() => setSelectedEmojiCategory(category)}
+                        className={`p-2 rounded mb-1 mr-1 transition-colors flex items-center justify-center ${
+                          selectedEmojiCategory === category
+                            ? 'bg-orange-500 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                        title={category}
+                      >
+                        <Icon className="w-4 h-4" />
+                      </button>
+                    );
+                  })}
+                </div>
+                
+                {/* Emoji Grid */}
+                <div className="p-2 max-h-60 overflow-y-auto">
+                  <div className="grid grid-cols-8 gap-1">
+                    {emojiCategories[selectedEmojiCategory].emojis.map((emoji, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleEmojiClick(emoji)}
+                        className="text-lg hover:bg-gray-100 rounded p-1 transition-colors"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <div className="flex-1 relative">
+            <input
+              ref={inputRef}
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              placeholder="Type a message..."
+              disabled={!isConnected}
+              className="w-full px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={!isConnected || !newMessage.trim()}
+            className="p-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed text-white rounded-full transition-all duration-200"
+          >
+            <Send className="w-5 h-5" />
+          </button>
+        </form>
+      </div>
+      
+      {/* File Upload Modal */}
+      {showFileUpload && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="p-4 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium text-gray-900">Upload Files</h3>
+                <button
+                  onClick={() => setShowFileUpload(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="p-4">
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*,video/*,.pdf,.doc,.docx,.doc"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-orange-500 transition-colors text-gray-600 hover:text-orange-500"
+              >
+                <Paperclip className="w-6 h-6 mx-auto mb-2" />
+                Click to select files (images, videos, documents)
+              </button>
+              {selectedFiles.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  <p className="text-sm font-medium text-gray-700">Selected Files:</p>
+                  {selectedFiles.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded border">
+                      <span className="text-sm text-gray-700">{file.name}</span>
+                      <button
+                        onClick={() => handleRemoveFile(index)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={handleSendFiles}
+                    className="w-full bg-orange-500 text-white py-2 rounded-lg hover:bg-orange-600 transition-colors mt-3"
+                  >
+                    Send Files
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default InlineChat;
