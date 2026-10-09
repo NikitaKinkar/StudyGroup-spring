@@ -20,14 +20,24 @@ public class ChatController {
         this.chatService = chatService;
     }
 
+    private Long parseGroupId(Object rawGroupId) {
+        if (rawGroupId == null) return null;
+        String str = String.valueOf(rawGroupId).trim();
+        try {
+            return Long.parseLong(str);
+        } catch (NumberFormatException e) {
+            return (long) Math.abs(str.hashCode());
+        }
+    }
+
     @MessageMapping("/chat.sendMessage")
     public ChatMessage sendMessage(@Payload Map<String, Object> messagePayload, 
                                   SimpMessageHeaderAccessor headerAccessor) {
         try {
             Object rawGroupId = messagePayload.get("groupId");
             if (rawGroupId == null) rawGroupId = messagePayload.get("group_id");
-            if (rawGroupId == null) return null;
-            Long groupId = Long.parseLong(String.valueOf(rawGroupId));
+            Long groupId = parseGroupId(rawGroupId);
+            if (groupId == null) return null;
 
             String senderEmail = (String) messagePayload.getOrDefault("senderEmail", messagePayload.get("sender_email"));
             String senderName = (String) messagePayload.getOrDefault("senderName", messagePayload.get("sender_name"));
@@ -54,8 +64,8 @@ public class ChatController {
         try {
             Object rawGroupId = messagePayload.get("groupId");
             if (rawGroupId == null) rawGroupId = messagePayload.get("group_id");
-            if (rawGroupId == null) return null;
-            Long groupId = Long.parseLong(String.valueOf(rawGroupId));
+            Long groupId = parseGroupId(rawGroupId);
+            if (groupId == null) return null;
 
             String senderName = (String) messagePayload.getOrDefault("senderName", messagePayload.get("sender_name"));
             if (senderName == null) senderName = "User";
