@@ -10,11 +10,11 @@ services:
       - key: PORT
         value: 8080
       - key: SPRING_DATASOURCE_URL
-        sync: false
+        value: "jdbc:mysql://gateway01.ap-northeast-1.prod.aws.tidbcloud.com:4000/studygroup_db?createDatabaseIfNotExist=true&sslMode=VERIFY_IDENTITY"
       - key: SPRING_DATASOURCE_USERNAME
-        sync: false
+        value: "3T14AaKv26o9rhu.root"
       - key: SPRING_DATASOURCE_PASSWORD
-        sync: false
+        value: "eLUxjZEcwgopzdE1"
       - key: JWT_SECRET
         generateValue: true
       - key: CORS_ALLOWED_ORIGINS
