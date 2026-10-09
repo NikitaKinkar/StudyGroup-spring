@@ -11,13 +11,22 @@ const apiClient = axios.create({
   timeout: 10000,
 });
 
-// Request interceptor to attach JWT token
+// Request interceptor to attach JWT token and User Email
 apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('studyconnect_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    try {
+      const userStr = localStorage.getItem('studyconnect_user');
+      if (userStr) {
+        const u = JSON.parse(userStr);
+        if (u && u.email) {
+          config.headers['X-User-Email'] = u.email;
+        }
+      }
+    } catch (e) {}
     return config;
   },
   (error) => Promise.reject(error)
@@ -237,14 +246,29 @@ export const sessionsApi = {
     return response.data;
   },
 
-  getCalendar: async () => {
-    const response = await apiClient.get('/sessions/calendar');
+  getCalendar: async (params = {}) => {
+    const today = new Date();
+    const defaultStart = new Date(today.getFullYear(), today.getMonth() - 1, 1).toISOString().split('T')[0];
+    const defaultEnd = new Date(today.getFullYear(), today.getMonth() + 2, 28).toISOString().split('T')[0];
+    const queryParams = {
+      startDate: params.startDate || defaultStart,
+      endDate: params.endDate || defaultEnd,
+      ...params,
+    };
+    const response = await apiClient.get('/sessions/calendar', { params: queryParams });
     return response.data;
   },
 
   join: async (sessionId, userEmail) => {
+    let email = userEmail;
+    if (!email) {
+      try {
+        const u = JSON.parse(localStorage.getItem('studyconnect_user') || '{}');
+        email = u.email;
+      } catch (e) {}
+    }
     const response = await apiClient.post(`/sessions/${sessionId}/join`, null, {
-      params: { userEmail },
+      params: email ? { userEmail: email } : {},
     });
     return response.data;
   },

@@ -14,10 +14,11 @@ export default function Auth() {
   const [successModal, setSuccessModal] = useState(null); // { type: "register"|"login", name }
   const [passwordResetSuccess, setPasswordResetSuccess] = useState(false);
 
-  // If already logged in, automatically redirect to Dashboard
+  // If already logged in with valid token, automatically redirect to Dashboard
   useEffect(() => {
     const stored = localStorage.getItem("studyconnect_user");
-    if (stored) {
+    const token = localStorage.getItem("studyconnect_token");
+    if (stored && token) {
       try {
         const u = JSON.parse(stored);
         if (u && (u.email || u.id)) {

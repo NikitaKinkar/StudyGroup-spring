@@ -76,15 +76,9 @@ export default function Dashboard() {
       userData = JSON.parse(localStorage.getItem("studyconnect_user"));
     } catch (e) {}
 
-    if (!userData) {
-      const existing = JSON.parse(localStorage.getItem("studyconnect_users") || "[]");
-      if (existing.length > 0) {
-        userData = existing[0];
-        localStorage.setItem("studyconnect_user", JSON.stringify(userData));
-      } else {
-        window.location.href = createPageUrl("Auth");
-        return;
-      }
+    if (!userData || !localStorage.getItem("studyconnect_token")) {
+      window.location.href = createPageUrl("Auth");
+      return;
     }
     setUser(userData);
 

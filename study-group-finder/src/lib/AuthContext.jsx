@@ -12,7 +12,7 @@ export const AuthProvider = ({ children }) => {
     }
   });
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return !!localStorage.getItem('studyconnect_user') || !!localStorage.getItem('studyconnect_token');
+    return !!localStorage.getItem('studyconnect_user') && !!localStorage.getItem('studyconnect_token');
   });
   const [isLoadingAuth, setIsLoadingAuth] = useState(false);
   const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(false);
@@ -30,7 +30,7 @@ export const AuthProvider = ({ children }) => {
       const token = localStorage.getItem('studyconnect_token');
       const savedUserStr = localStorage.getItem('studyconnect_user');
       
-      if (token) {
+      if (token && savedUserStr) {
         try {
           const profileData = await authApi.getProfile();
           if (profileData && profileData.user) {
@@ -48,9 +48,7 @@ export const AuthProvider = ({ children }) => {
         } catch (apiErr) {
           console.warn('Backend token verification failed, using stored session:', apiErr.message);
         }
-      }
 
-      if (savedUserStr) {
         try {
           const parsed = JSON.parse(savedUserStr);
           setUser(parsed);
@@ -63,6 +61,8 @@ export const AuthProvider = ({ children }) => {
       // Default unauthenticated
       setUser(null);
       setIsAuthenticated(false);
+      localStorage.removeItem('studyconnect_user');
+      localStorage.removeItem('studyconnect_token');
       setIsLoadingAuth(false);
     } catch (error) {
       console.error('App state check failed:', error);

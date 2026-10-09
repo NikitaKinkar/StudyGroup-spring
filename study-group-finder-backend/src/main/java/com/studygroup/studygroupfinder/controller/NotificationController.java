@@ -24,31 +24,41 @@ public class NotificationController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Notification>> getUserNotifications(@RequestHeader("Authorization") String token) {
+    public ResponseEntity<List<Notification>> getUserNotifications(@RequestHeader(value = "Authorization", required = false) String token) {
         String email = getUserEmailFromToken(token);
+        if (email == null) {
+            return ResponseEntity.ok(java.util.Collections.emptyList());
+        }
         List<Notification> notifications = notificationService.getUserNotifications(email);
         return ResponseEntity.ok(notifications);
     }
 
     @GetMapping("/unread")
-    public ResponseEntity<List<Notification>> getUnreadNotifications(@RequestHeader("Authorization") String token) {
+    public ResponseEntity<List<Notification>> getUnreadNotifications(@RequestHeader(value = "Authorization", required = false) String token) {
         String email = getUserEmailFromToken(token);
+        if (email == null) {
+            return ResponseEntity.ok(java.util.Collections.emptyList());
+        }
         List<Notification> notifications = notificationService.getUnreadNotifications(email);
         return ResponseEntity.ok(notifications);
     }
 
     @GetMapping("/unread-count")
-    public ResponseEntity<Map<String, Long>> getUnreadCount(@RequestHeader("Authorization") String token) {
+    public ResponseEntity<Map<String, Long>> getUnreadCount(@RequestHeader(value = "Authorization", required = false) String token) {
         String email = getUserEmailFromToken(token);
-        Long count = notificationService.getUnreadCount(email);
         Map<String, Long> response = new HashMap<>();
+        if (email == null) {
+            response.put("unreadCount", 0L);
+            return ResponseEntity.ok(response);
+        }
+        Long count = notificationService.getUnreadCount(email);
         response.put("unreadCount", count);
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/{id}/read")
     public ResponseEntity<?> markAsRead(@PathVariable Long id,
-                                       @RequestHeader("Authorization") String token) {
+                                       @RequestHeader(value = "Authorization", required = false) String token) {
         try {
             notificationService.markAsRead(id);
             Map<String, String> response = new HashMap<>();
@@ -62,9 +72,11 @@ public class NotificationController {
     }
 
     @PostMapping("/mark-all-read")
-    public ResponseEntity<?> markAllAsRead(@RequestHeader("Authorization") String token) {
+    public ResponseEntity<?> markAllAsRead(@RequestHeader(value = "Authorization", required = false) String token) {
         String email = getUserEmailFromToken(token);
-        notificationService.markAllAsRead(email);
+        if (email != null) {
+            notificationService.markAllAsRead(email);
+        }
         Map<String, String> response = new HashMap<>();
         response.put("message", "All notifications marked as read");
         return ResponseEntity.ok(response);
@@ -72,7 +84,7 @@ public class NotificationController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteNotification(@PathVariable Long id,
-                                              @RequestHeader("Authorization") String token) {
+                                              @RequestHeader(value = "Authorization", required = false) String token) {
         try {
             notificationService.deleteNotification(id);
             Map<String, String> response = new HashMap<>();
@@ -86,7 +98,14 @@ public class NotificationController {
     }
 
     private String getUserEmailFromToken(String token) {
-        String jwtToken = token.substring(7);
-        return jwtService.extractEmail(jwtToken);
+        if (token == null || !token.startsWith("Bearer ")) {
+            return null;
+        }
+        try {
+            String jwtToken = token.substring(7);
+            return jwtService.extractEmail(jwtToken);
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

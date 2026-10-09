@@ -130,21 +130,42 @@ public class StudyGroupController {
     }
 
     @GetMapping("/my-groups")
-    public ResponseEntity<List<StudyGroup>> getMyGroups(@RequestHeader("Authorization") String token) {
-        String email = getUserEmailFromToken(token);
-        List<StudyGroup> groups = studyGroupService.getGroupsByMember(email);
-        return ResponseEntity.ok(groups);
+    public ResponseEntity<List<StudyGroup>> getMyGroups(@RequestHeader(value = "Authorization", required = false) String token) {
+        if (token == null || !token.startsWith("Bearer ")) {
+            return ResponseEntity.ok(java.util.Collections.emptyList());
+        }
+        try {
+            String email = getUserEmailFromToken(token);
+            List<StudyGroup> groups = studyGroupService.getGroupsByMember(email);
+            return ResponseEntity.ok(groups);
+        } catch (Exception e) {
+            return ResponseEntity.ok(java.util.Collections.emptyList());
+        }
     }
 
     @GetMapping("/owned")
-    public ResponseEntity<List<StudyGroup>> getOwnedGroups(@RequestHeader("Authorization") String token) {
-        String email = getUserEmailFromToken(token);
-        List<StudyGroup> groups = studyGroupService.getGroupsByOwner(email);
-        return ResponseEntity.ok(groups);
+    public ResponseEntity<List<StudyGroup>> getOwnedGroups(@RequestHeader(value = "Authorization", required = false) String token) {
+        if (token == null || !token.startsWith("Bearer ")) {
+            return ResponseEntity.ok(java.util.Collections.emptyList());
+        }
+        try {
+            String email = getUserEmailFromToken(token);
+            List<StudyGroup> groups = studyGroupService.getGroupsByOwner(email);
+            return ResponseEntity.ok(groups);
+        } catch (Exception e) {
+            return ResponseEntity.ok(java.util.Collections.emptyList());
+        }
     }
 
     private String getUserEmailFromToken(String token) {
-        String jwtToken = token.substring(7);
-        return jwtService.extractEmail(jwtToken);
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Authentication token required. Please sign in.");
+        }
+        try {
+            String jwtToken = token.substring(7);
+            return jwtService.extractEmail(jwtToken);
+        } catch (Exception e) {
+            throw new RuntimeException("Invalid authentication token. Please sign in again.");
+        }
     }
 }

@@ -44,8 +44,10 @@ public class AuthController {
     public ResponseEntity<?> signUp(@Valid @RequestBody SignUpRequest signUpRequest) {
         try {
             User user = authService.signUp(signUpRequest);
+            String token = authService.getJwtService().generateToken(user.getEmail());
             Map<String, Object> response = new HashMap<>();
             response.put("message", "User registered successfully");
+            response.put("token", token);
             response.put("user", createUserResponseMap(user));
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {

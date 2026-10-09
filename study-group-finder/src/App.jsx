@@ -46,7 +46,12 @@ const AuthenticatedApp = () => {
     }
   }
 
-  const hasUser = isAuthenticated || !!user || !!localStorage.getItem("studyconnect_user");
+  const hasUser = Boolean(
+    isAuthenticated && 
+    user && 
+    localStorage.getItem("studyconnect_user") && 
+    localStorage.getItem("studyconnect_token")
+  );
 
   console.log('App.jsx: Rendering main app routes, hasUser:', hasUser);
   // Render the main app
