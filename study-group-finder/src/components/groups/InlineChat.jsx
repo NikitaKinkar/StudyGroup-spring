@@ -7,7 +7,7 @@ import { chatApi } from '@/services/api';
 const InlineChat = ({ group, user, onClose, isInLayout = false, isCourseChat = false, courseInfo = null }) => {
   const activeUser = user || (() => {
     try {
-      return JSON.parse(localStorage.getItem("studyconnect_user") || "null");
+      return JSON.parse(sessionStorage.getItem("studyconnect_user") || localStorage.getItem("studyconnect_user") || "null");
     } catch (e) {
       return null;
     }

@@ -16,8 +16,8 @@ export default function Sessions() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   useEffect(() => {
-    const stored = localStorage.getItem("studyconnect_user");
-    if (!stored) { 
+    const stored = sessionStorage.getItem("studyconnect_user");
+    if (!stored || !sessionStorage.getItem("studyconnect_token")) { 
       window.location.href = createPageUrl("Auth"); 
       return; 
     }

@@ -49,38 +49,38 @@ const AuthenticatedApp = () => {
   const hasUser = Boolean(
     isAuthenticated && 
     user && 
-    localStorage.getItem("studyconnect_user") && 
-    localStorage.getItem("studyconnect_token")
+    sessionStorage.getItem("studyconnect_user") && 
+    sessionStorage.getItem("studyconnect_token")
   );
 
   console.log('App.jsx: Rendering main app routes, hasUser:', hasUser);
   // Render the main app
   return (
     <Routes>
-      {/* Root Route: If logged in, go straight to Dashboard; else Auth */}
-      <Route path="/" element={
-        <LayoutWrapper currentPageName={hasUser ? "Dashboard" : "Auth"}>
-          {hasUser ? <Pages.Dashboard /> : <Pages.Auth />}
-        </LayoutWrapper>
-      } />
+      {/* Root Route: strictly redirect based on session auth */}
+      <Route path="/" element={<Navigate to={hasUser ? "/Dashboard" : "/Auth"} replace />} />
 
-      {/* Pages mapped for BOTH exact case and lowercase */}
+      {/* Pages mapped for BOTH exact case and lowercase with strict route guards */}
       {Object.entries(Pages).map(([path, Page]) => (
         <React.Fragment key={path}>
           <Route
             path={`/${path}`}
             element={
-              <LayoutWrapper currentPageName={path}>
-                <Page />
-              </LayoutWrapper>
+              path.toLowerCase() === "auth" ? (
+                hasUser ? <Navigate to="/Dashboard" replace /> : <LayoutWrapper currentPageName="Auth"><Page /></LayoutWrapper>
+              ) : (
+                hasUser ? <LayoutWrapper currentPageName={path}><Page /></LayoutWrapper> : <Navigate to="/Auth" replace />
+              )
             }
           />
           <Route
             path={`/${path.toLowerCase()}`}
             element={
-              <LayoutWrapper currentPageName={path}>
-                <Page />
-              </LayoutWrapper>
+              path.toLowerCase() === "auth" ? (
+                hasUser ? <Navigate to="/Dashboard" replace /> : <LayoutWrapper currentPageName="Auth"><Page /></LayoutWrapper>
+              ) : (
+                hasUser ? <LayoutWrapper currentPageName={path}><Page /></LayoutWrapper> : <Navigate to="/Auth" replace />
+              )
             }
           />
         </React.Fragment>
@@ -90,18 +90,26 @@ const AuthenticatedApp = () => {
       <Route
         path="/chat/:groupId"
         element={
-          <LayoutWrapper currentPageName="Chat">
-            <Pages.Chat />
-          </LayoutWrapper>
+          hasUser ? (
+            <LayoutWrapper currentPageName="Chat">
+              <Pages.Chat />
+            </LayoutWrapper>
+          ) : (
+            <Navigate to="/Auth" replace />
+          )
         }
       />
       {/* Dynamic groups route with optional groupId */}
       <Route
         path="/groups/:groupId?"
         element={
-          <LayoutWrapper currentPageName="Groups">
-            <Pages.Groups />
-          </LayoutWrapper>
+          hasUser ? (
+            <LayoutWrapper currentPageName="Groups">
+              <Pages.Groups />
+            </LayoutWrapper>
+          ) : (
+            <Navigate to="/Auth" replace />
+          )
         }
       />
       {/* Catch-all redirect to / */}

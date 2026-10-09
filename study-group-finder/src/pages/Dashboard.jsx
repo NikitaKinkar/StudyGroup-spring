@@ -73,10 +73,10 @@ export default function Dashboard() {
     // Load user data
     let userData = null;
     try {
-      userData = JSON.parse(localStorage.getItem("studyconnect_user"));
+      userData = JSON.parse(sessionStorage.getItem("studyconnect_user"));
     } catch (e) {}
 
-    if (!userData || !localStorage.getItem("studyconnect_token")) {
+    if (!userData || !sessionStorage.getItem("studyconnect_token")) {
       window.location.href = createPageUrl("Auth");
       return;
     }

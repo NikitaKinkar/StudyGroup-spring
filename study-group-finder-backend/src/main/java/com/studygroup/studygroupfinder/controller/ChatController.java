@@ -21,8 +21,14 @@ public class ChatController {
     }
 
     private Long parseGroupId(Object rawGroupId) {
-        if (rawGroupId == null) return null;
+        if (rawGroupId == null) return 1L;
         String str = String.valueOf(rawGroupId).trim();
+        if (str.startsWith("group_")) {
+            String sub = str.substring("group_".length());
+            try {
+                return Long.parseLong(sub);
+            } catch (NumberFormatException ignored) {}
+        }
         try {
             return Long.parseLong(str);
         } catch (NumberFormatException e) {

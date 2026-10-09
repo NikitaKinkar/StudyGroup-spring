@@ -11,8 +11,8 @@ export default function Profile() {
   const [showEdit, setShowEdit] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem("studyconnect_user");
-    if (!stored) {
+    const stored = sessionStorage.getItem("studyconnect_user");
+    if (!stored || !sessionStorage.getItem("studyconnect_token")) {
       window.location.href = createPageUrl("Auth");
       return;
     }
@@ -20,8 +20,8 @@ export default function Profile() {
   }, []);
 
   const handleSaveProfile = (updatedData) => {
-    // Update user in localStorage
-    localStorage.setItem("studyconnect_user", JSON.stringify(updatedData));
+    // Update user in sessionStorage
+    sessionStorage.setItem("studyconnect_user", JSON.stringify(updatedData));
     
     // Update user in users list
     const users = JSON.parse(localStorage.getItem("studyconnect_users") || "[]");

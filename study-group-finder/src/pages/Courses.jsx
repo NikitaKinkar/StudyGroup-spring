@@ -79,7 +79,7 @@ const COURSES_DATA = [
 export default function Courses() {
   const [user, setUser] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem("studyconnect_user") || "null");
+      return JSON.parse(sessionStorage.getItem("studyconnect_user") || "null");
     } catch (e) {
       return null;
     }
@@ -93,8 +93,8 @@ export default function Courses() {
   const [chatCourseId, setChatCourseId] = useState(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem("studyconnect_user");
-    if (!stored) { window.location.href = createPageUrl("Auth"); return; }
+    const stored = sessionStorage.getItem("studyconnect_user");
+    if (!stored || !sessionStorage.getItem("studyconnect_token")) { window.location.href = createPageUrl("Auth"); return; }
     setUser(JSON.parse(stored));
 
     // Load enrolled courses

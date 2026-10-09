@@ -3,6 +3,8 @@ import { createPageUrl } from "@/utils/index.js";
 
 export default function TopBar({ user, extraContent }) {
   const handleLogout = () => {
+    sessionStorage.removeItem("studyconnect_user");
+    sessionStorage.removeItem("studyconnect_token");
     localStorage.removeItem("studyconnect_user");
     localStorage.removeItem("studyconnect_token");
     window.location.href = createPageUrl("Auth");

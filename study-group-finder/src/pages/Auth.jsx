@@ -67,8 +67,10 @@ export default function Auth() {
         existingUsers.push(newUser);
       }
       localStorage.setItem("studyconnect_users", JSON.stringify(existingUsers));
-      localStorage.setItem("studyconnect_user", JSON.stringify(newUser));
-      localStorage.setItem("studyconnect_token", result?.token || "token_" + Date.now());
+      sessionStorage.setItem("studyconnect_user", JSON.stringify(newUser));
+      sessionStorage.setItem("studyconnect_token", result?.token || "token_" + Date.now());
+      localStorage.removeItem("studyconnect_user");
+      localStorage.removeItem("studyconnect_token");
 
       // Redirect immediately to Dashboard
       window.location.href = createPageUrl("Dashboard");
@@ -129,8 +131,10 @@ export default function Auth() {
       }
 
       if (userData) {
-        localStorage.setItem("studyconnect_token", token || "token_" + Date.now());
-        localStorage.setItem("studyconnect_user", JSON.stringify(userData));
+        sessionStorage.setItem("studyconnect_token", token || "token_" + Date.now());
+        sessionStorage.setItem("studyconnect_user", JSON.stringify(userData));
+        localStorage.removeItem("studyconnect_token");
+        localStorage.removeItem("studyconnect_user");
 
         // Directly navigate to Dashboard
         console.log("Sign in successful, navigating to Dashboard...");

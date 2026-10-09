@@ -14,12 +14,12 @@ const apiClient = axios.create({
 // Request interceptor to attach JWT token and User Email
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('studyconnect_token');
+    const token = sessionStorage.getItem('studyconnect_token') || localStorage.getItem('studyconnect_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     try {
-      const userStr = localStorage.getItem('studyconnect_user');
+      const userStr = sessionStorage.getItem('studyconnect_user') || localStorage.getItem('studyconnect_user');
       if (userStr) {
         const u = JSON.parse(userStr);
         if (u && u.email) {
@@ -38,10 +38,12 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response && error.response.status === 401) {
       console.warn('Session expired or unauthorized request');
-      // If unauthorized on authenticated route, we can remove stale token
       const currentPath = window.location.pathname;
       if (!currentPath.includes('/Auth') && !currentPath.includes('/login')) {
+        sessionStorage.removeItem('studyconnect_token');
+        sessionStorage.removeItem('studyconnect_user');
         localStorage.removeItem('studyconnect_token');
+        localStorage.removeItem('studyconnect_user');
       }
     }
     return Promise.reject(error);

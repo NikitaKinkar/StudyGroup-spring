@@ -6,13 +6,16 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('studyconnect_user') || 'null');
+      // Purge any stale persistent session from localStorage to honor requirement
+      localStorage.removeItem('studyconnect_user');
+      localStorage.removeItem('studyconnect_token');
+      return JSON.parse(sessionStorage.getItem('studyconnect_user') || 'null');
     } catch (e) {
       return null;
     }
   });
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return !!localStorage.getItem('studyconnect_user') && !!localStorage.getItem('studyconnect_token');
+    return !!sessionStorage.getItem('studyconnect_user') && !!sessionStorage.getItem('studyconnect_token');
   });
   const [isLoadingAuth, setIsLoadingAuth] = useState(false);
   const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(false);
@@ -27,8 +30,12 @@ export const AuthProvider = ({ children }) => {
       setIsLoadingAuth(true);
       setAuthError(null);
       
-      const token = localStorage.getItem('studyconnect_token');
-      const savedUserStr = localStorage.getItem('studyconnect_user');
+      // Clean legacy localStorage credentials
+      localStorage.removeItem('studyconnect_user');
+      localStorage.removeItem('studyconnect_token');
+
+      const token = sessionStorage.getItem('studyconnect_token');
+      const savedUserStr = sessionStorage.getItem('studyconnect_user');
       
       if (token && savedUserStr) {
         try {
@@ -41,7 +48,7 @@ export const AuthProvider = ({ children }) => {
             };
             setUser(userData);
             setIsAuthenticated(true);
-            localStorage.setItem('studyconnect_user', JSON.stringify(userData));
+            sessionStorage.setItem('studyconnect_user', JSON.stringify(userData));
             setIsLoadingAuth(false);
             return;
           }
@@ -61,8 +68,8 @@ export const AuthProvider = ({ children }) => {
       // Default unauthenticated
       setUser(null);
       setIsAuthenticated(false);
-      localStorage.removeItem('studyconnect_user');
-      localStorage.removeItem('studyconnect_token');
+      sessionStorage.removeItem('studyconnect_user');
+      sessionStorage.removeItem('studyconnect_token');
       setIsLoadingAuth(false);
     } catch (error) {
       console.error('App state check failed:', error);
@@ -80,8 +87,10 @@ export const AuthProvider = ({ children }) => {
       name: data.user.fullName || data.user.full_name,
       full_name: data.user.fullName || data.user.full_name,
     };
-    localStorage.setItem('studyconnect_token', token);
-    localStorage.setItem('studyconnect_user', JSON.stringify(userData));
+    sessionStorage.setItem('studyconnect_token', token);
+    sessionStorage.setItem('studyconnect_user', JSON.stringify(userData));
+    localStorage.removeItem('studyconnect_token');
+    localStorage.removeItem('studyconnect_user');
     setUser(userData);
     setIsAuthenticated(true);
     return data;
@@ -89,10 +98,25 @@ export const AuthProvider = ({ children }) => {
 
   const signup = async (formData) => {
     const data = await authApi.signUp(formData);
+    if (data && data.token && data.user) {
+      const userData = {
+        ...data.user,
+        name: data.user.fullName || data.user.full_name,
+        full_name: data.user.fullName || data.user.full_name,
+      };
+      sessionStorage.setItem('studyconnect_token', data.token);
+      sessionStorage.setItem('studyconnect_user', JSON.stringify(userData));
+      localStorage.removeItem('studyconnect_token');
+      localStorage.removeItem('studyconnect_user');
+      setUser(userData);
+      setIsAuthenticated(true);
+    }
     return data;
   };
 
   const logout = (shouldRedirect = true) => {
+    sessionStorage.removeItem('studyconnect_token');
+    sessionStorage.removeItem('studyconnect_user');
     localStorage.removeItem('studyconnect_token');
     localStorage.removeItem('studyconnect_user');
     setUser(null);

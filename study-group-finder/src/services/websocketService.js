@@ -34,7 +34,7 @@ class WebSocketService {
     this.userName = userName;
 
     // If already connected, re-subscribe to the new group
-    if (this.client && this.connected && !this.mockMode) {
+    if (this.client && this.connected) {
       this.subscribeToGroup(groupId);
       return;
     }
@@ -42,18 +42,17 @@ class WebSocketService {
     try {
       const wsUrl = this.getWsUrl();
       console.log('Connecting WebSocket via SockJS to:', wsUrl);
-      const socket = new SockJS(wsUrl);
-      const token = localStorage.getItem('studyconnect_token');
+      const token = sessionStorage.getItem('studyconnect_token') || localStorage.getItem('studyconnect_token');
 
       this.client = new Client({
-        webSocketFactory: () => socket,
+        webSocketFactory: () => new SockJS(this.getWsUrl()),
         connectHeaders: token ? {
           Authorization: `Bearer ${token}`
         } : {},
         debug: (str) => {
           // console.log('STOMP: ', str);
         },
-        reconnectDelay: 4000,
+        reconnectDelay: 3000,
         heartbeatIncoming: 4000,
         heartbeatOutgoing: 4000,
       });
@@ -71,7 +70,6 @@ class WebSocketService {
 
       this.client.onStompError = (frame) => {
         console.warn('STOMP protocol error:', frame);
-        this.switchToMockMode();
       };
 
       this.client.onWebSocketError = (err) => {
@@ -80,16 +78,8 @@ class WebSocketService {
 
       this.client.activate();
 
-      // Graceful fallback to mock mode after 4s if server is unreachable
-      setTimeout(() => {
-        if (!this.connected) {
-          console.log('WebSocket connection timed out, running in local sync mode');
-          this.switchToMockMode();
-        }
-      }, 4000);
-
     } catch (error) {
-      console.warn('WebSocket initialization failed, running in local sync mode:', error);
+      console.warn('WebSocket initialization failed:', error);
       this.switchToMockMode();
     }
   }
@@ -97,27 +87,42 @@ class WebSocketService {
   subscribeToGroup(groupId) {
     if (!this.client || !this.connected || !groupId) return;
 
-    if (this.currentSubscription) {
-      try {
-        this.currentSubscription.unsubscribe();
-      } catch (e) {
-        console.warn('Error unsubscribing previous topic:', e);
-      }
-      this.currentSubscription = null;
+    if (this.currentSubscriptions && Array.isArray(this.currentSubscriptions)) {
+      this.currentSubscriptions.forEach(sub => {
+        try { sub.unsubscribe(); } catch (e) {}
+      });
     }
+    this.currentSubscriptions = [];
+
+    const handleMsg = (message) => {
+      try {
+        const chatMessage = JSON.parse(message.body);
+        if (this.onMessageCallback) {
+          this.onMessageCallback(chatMessage);
+        }
+      } catch (e) {
+        console.error('Failed to parse STOMP message body:', e);
+      }
+    };
 
     try {
-      this.currentSubscription = this.client.subscribe(`/topic/group/${groupId}`, (message) => {
-        try {
-          const chatMessage = JSON.parse(message.body);
-          if (this.onMessageCallback) {
-            this.onMessageCallback(chatMessage);
-          }
-        } catch (e) {
-          console.error('Failed to parse STOMP message body:', e);
-        }
-      });
+      const mainSub = this.client.subscribe(`/topic/group/${groupId}`, handleMsg);
+      this.currentSubscriptions.push(mainSub);
       console.log(`Subscribed to /topic/group/${groupId}`);
+
+      // Also subscribe to normalized alias if groupId starts with group_ or is numeric
+      const rawIdStr = String(groupId).trim();
+      let altTopic = null;
+      if (rawIdStr.startsWith('group_')) {
+        altTopic = `/topic/group/${rawIdStr.replace('group_', '')}`;
+      } else if (!isNaN(rawIdStr)) {
+        altTopic = `/topic/group/group_${rawIdStr}`;
+      }
+      if (altTopic) {
+        const altSub = this.client.subscribe(altTopic, handleMsg);
+        this.currentSubscriptions.push(altSub);
+        console.log(`Also subscribed to alias topic: ${altTopic}`);
+      }
     } catch (err) {
       console.error('Failed to subscribe to group topic:', err);
     }
@@ -125,16 +130,17 @@ class WebSocketService {
 
   switchToMockMode() {
     this.mockMode = true;
-    this.connected = true;
     console.log('Running WebSocket in fallback mode');
   }
 
   disconnect() {
-    if (this.currentSubscription) {
-      try { this.currentSubscription.unsubscribe(); } catch (e) {}
-      this.currentSubscription = null;
+    if (this.currentSubscriptions && Array.isArray(this.currentSubscriptions)) {
+      this.currentSubscriptions.forEach(sub => {
+        try { sub.unsubscribe(); } catch (e) {}
+      });
+      this.currentSubscriptions = [];
     }
-    if (this.client && this.connected && !this.mockMode) {
+    if (this.client && this.connected) {
       try { this.client.deactivate(); } catch (e) {}
     }
     this.connected = false;

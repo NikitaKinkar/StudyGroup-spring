@@ -15,15 +15,15 @@ const ChatPage = () => {
 
   const activeUser = user || (() => {
     try {
-      return JSON.parse(localStorage.getItem("studyconnect_user") || "null");
+      return JSON.parse(sessionStorage.getItem("studyconnect_user") || "null");
     } catch (e) {
       return null;
     }
   })();
 
-  // If no user, redirect to auth
-  if (!activeUser) {
-    console.log('ChatPage: No user found, redirecting to auth');
+  // If no user or token in sessionStorage, redirect to auth
+  if (!activeUser || !sessionStorage.getItem("studyconnect_token")) {
+    console.log('ChatPage: No valid session auth found, redirecting to auth');
     navigate('/auth');
     return null;
   }

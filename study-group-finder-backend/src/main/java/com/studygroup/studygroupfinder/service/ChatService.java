@@ -60,9 +60,19 @@ public class ChatService {
 
     public ChatMessage sendMessage(Long groupId, String senderEmail, String senderName, String content,
                                   String messageType, String fileUrl, String fileName, String fileType, Long fileSize) {
-        // Verify group exists
+        // Verify group exists or create placeholder so chat is never blocked
         StudyGroup group = studyGroupRepository.findById(groupId)
-                .orElseThrow(() -> new RuntimeException("Group not found"));
+                .orElseGet(() -> {
+                    StudyGroup autoGroup = new StudyGroup();
+                    autoGroup.setId(groupId);
+                    autoGroup.setName("Study Group #" + groupId);
+                    autoGroup.setDescription("Real-time study room");
+                    autoGroup.setCourseName("General Studies");
+                    autoGroup.setOwnerEmail(senderEmail != null ? senderEmail : "system@studyconnect.com");
+                    autoGroup.setOwnerName(senderName != null ? senderName : "Host");
+                    autoGroup.setMaxMembers(50);
+                    return studyGroupRepository.save(autoGroup);
+                });
 
         // Verify membership (owner or member)
         verifyMembership(group, senderEmail);
@@ -86,9 +96,10 @@ public class ChatService {
         }
         message = chatMessageRepository.save(message);
 
-        // Send message to all group members via WebSocket
+        // Send message to all group members via WebSocket to both numeric and prefixed topics
         try {
             messagingTemplate.convertAndSend("/topic/group/" + groupId, message);
+            messagingTemplate.convertAndSend("/topic/group/group_" + groupId, message);
         } catch (Exception e) {
             System.err.println("Failed to broadcast chat message via WebSocket: " + e.getMessage());
         }
@@ -97,9 +108,12 @@ public class ChatService {
     }
 
     public List<ChatMessage> getChatHistory(Long groupId, String userEmail) {
-        // Verify group exists
-        StudyGroup group = studyGroupRepository.findById(groupId)
-                .orElseThrow(() -> new RuntimeException("Group not found"));
+        if (groupId == null) return List.of();
+        // Verify group exists or return empty list
+        StudyGroup group = studyGroupRepository.findById(groupId).orElse(null);
+        if (group == null) {
+            return List.of();
+        }
 
         // Verify membership
         verifyMembership(group, userEmail);
@@ -108,10 +122,16 @@ public class ChatService {
     }
 
     public List<ChatMessage> getRecentMessages(Long groupId, Timestamp since) {
+        if (groupId == null) return List.of();
         return chatMessageRepository.findByGroupIdAndTimestampAfterOrderByTimestampAsc(groupId, since);
     }
 
     public Long getMessageCount(Long groupId) {
-        return chatMessageRepository.countMessagesByGroupId(groupId);
+        if (groupId == null) return 0L;
+        try {
+            return chatMessageRepository.countMessagesByGroupId(groupId);
+        } catch (Exception e) {
+            return 0L;
+        }
     }
 }

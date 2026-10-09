@@ -39,24 +39,42 @@ public class ChatRestController {
         }
     }
 
+    private Long parseGroupId(Object rawGroupId) {
+        if (rawGroupId == null) return 1L;
+        String str = String.valueOf(rawGroupId).trim();
+        if (str.startsWith("group_")) {
+            String sub = str.substring("group_".length());
+            try {
+                return Long.parseLong(sub);
+            } catch (NumberFormatException ignored) {}
+        }
+        try {
+            return Long.parseLong(str);
+        } catch (NumberFormatException e) {
+            return (long) Math.abs(str.hashCode());
+        }
+    }
+
     @GetMapping("/history/{groupId}")
     public ResponseEntity<List<ChatMessage>> getChatHistory(
-            @PathVariable Long groupId,
+            @PathVariable String groupId,
             @RequestParam(required = false) String userEmail) {
         try {
-            List<ChatMessage> messages = chatService.getChatHistory(groupId, userEmail);
+            Long parsedId = parseGroupId(groupId);
+            List<ChatMessage> messages = chatService.getChatHistory(parsedId, userEmail);
             return ResponseEntity.ok(messages);
         } catch (Exception e) {
             System.err.println("Error fetching chat history for group " + groupId + ": " + e.getMessage());
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.ok(List.of());
         }
     }
 
     @PostMapping("/send")
     public ResponseEntity<?> sendMessage(@RequestBody ChatMessageRequest request) {
         try {
+            Long parsedGroupId = parseGroupId(request.getGroupId());
             ChatMessage message = chatService.sendMessage(
-                    request.getGroupId(),
+                    parsedGroupId,
                     request.getSenderEmail(),
                     request.getSenderName(),
                     request.getContent(),
@@ -89,7 +107,7 @@ public class ChatRestController {
 
             Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
 
-            String fileUrl = "http://localhost:8080/api/chat/files/" + uniqueName;
+            String fileUrl = "/api/chat/files/" + uniqueName;
 
             Map<String, Object> response = new HashMap<>();
             response.put("fileUrl", fileUrl);
@@ -136,18 +154,19 @@ public class ChatRestController {
     }
 
     @GetMapping("/count/{groupId}")
-    public ResponseEntity<Long> getMessageCount(@PathVariable Long groupId) {
+    public ResponseEntity<Long> getMessageCount(@PathVariable String groupId) {
         try {
-            Long count = chatService.getMessageCount(groupId);
+            Long parsedId = parseGroupId(groupId);
+            Long count = chatService.getMessageCount(parsedId);
             return ResponseEntity.ok(count);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.ok(0L);
         }
     }
 
     public static class ChatMessageRequest {
         @JsonAlias({"groupId", "group_id"})
-        private Long groupId;
+        private Object groupId;
 
         @JsonAlias({"senderEmail", "sender_email"})
         private String senderEmail;
@@ -174,8 +193,8 @@ public class ChatRestController {
         private Long fileSize;
 
         // Getters and Setters
-        public Long getGroupId() { return groupId; }
-        public void setGroupId(Long groupId) { this.groupId = groupId; }
+        public Object getGroupId() { return groupId; }
+        public void setGroupId(Object groupId) { this.groupId = groupId; }
 
         public String getSenderEmail() { return senderEmail; }
         public void setSenderEmail(String senderEmail) { this.senderEmail = senderEmail; }

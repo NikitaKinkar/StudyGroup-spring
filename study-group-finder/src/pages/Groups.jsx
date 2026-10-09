@@ -19,7 +19,7 @@ export default function Groups() {
   const { groupId: urlGroupId } = useParams();
   const [user, setUser] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem("studyconnect_user") || "null");
+      return JSON.parse(sessionStorage.getItem("studyconnect_user") || "null");
     } catch (e) {
       return null;
     }
@@ -146,8 +146,8 @@ export default function Groups() {
   };
 
   useEffect(() => {
-    const stored = localStorage.getItem("studyconnect_user");
-    if (!stored) { window.location.href = createPageUrl("Auth"); return; }
+    const stored = sessionStorage.getItem("studyconnect_user");
+    if (!stored || !sessionStorage.getItem("studyconnect_token")) { window.location.href = createPageUrl("Auth"); return; }
     setUser(JSON.parse(stored));
     
     // Check URL params for direct group view or chat
