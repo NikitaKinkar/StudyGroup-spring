@@ -13,8 +13,16 @@ const ChatPage = () => {
   console.log('ChatPage: groupId:', groupId);
   console.log('ChatPage: user:', user);
 
+  const activeUser = user || (() => {
+    try {
+      return JSON.parse(localStorage.getItem("studyconnect_user") || "null");
+    } catch (e) {
+      return null;
+    }
+  })();
+
   // If no user, redirect to auth
-  if (!user) {
+  if (!activeUser) {
     console.log('ChatPage: No user found, redirecting to auth');
     navigate('/auth');
     return null;
@@ -64,18 +72,22 @@ const ChatPage = () => {
       console.log('ChatPage: Mock groups added:', mockGroups);
     }
     
-    const userGroups = allGroups.filter(group => 
-      group.members?.some(member => member.email === user?.email) ||
-      group.owner_email === user?.email
-    );
+    const userEmail = (user?.email || '').toLowerCase();
+    const userGroups = allGroups.filter(group => {
+      const owner = (group.owner_email || group.ownerEmail || '').toLowerCase();
+      const isOwner = userEmail && owner === userEmail;
+      const isMember = (group.members || []).some(m => (m.email || m.userEmail || '').toLowerCase() === userEmail);
+      return isOwner || isMember;
+    });
     
     console.log('ChatPage: User groups found:', userGroups);
     
-    if (userGroups.length > 0) {
-      // Navigate to the first group's chat
-      const firstGroup = userGroups[0];
-      console.log('ChatPage: Navigating to group:', firstGroup.id, firstGroup.name);
-      navigate(`/chat/${firstGroup.id}`, { replace: true });
+    const targetGroup = userGroups.length > 0 ? userGroups[0] : (allGroups.length > 0 ? allGroups[0] : null);
+    
+    if (targetGroup) {
+      // Navigate to group's chat
+      console.log('ChatPage: Navigating to group:', targetGroup.id, targetGroup.name);
+      navigate(`/chat/${targetGroup.id}`, { replace: true });
       return null;
     } else {
       // No groups available, show message
@@ -108,7 +120,7 @@ const ChatPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <ChatLayout user={user} onClose={handleCloseChat} groupId={groupId} />
+      <ChatLayout user={activeUser} onClose={handleCloseChat} groupId={groupId} />
     </div>
   );
 };

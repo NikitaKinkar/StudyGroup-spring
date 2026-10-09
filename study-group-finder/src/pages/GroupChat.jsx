@@ -3,6 +3,7 @@ import { createPageUrl } from '@/utils/index.js';
 import { MessageCircle, Send, Users, ArrowLeft, Search, Paperclip, MoreVertical, Smile, Reply, Edit, Trash2, X, File, Image, Video, FileText } from 'lucide-react';
 import websocketService from '../services/websocketService';
 import chatService from '../services/chatService';
+import { chatApi, groupsApi } from '@/services/api';
 
 export default function GroupChat() {
   console.log('GroupChat: Component loaded');
@@ -36,12 +37,28 @@ export default function GroupChat() {
     if (!user) return;
     
     // Get user's enrolled groups
-    const fetchUserGroups = () => {
-      const allGroups = JSON.parse(localStorage.getItem("studyconnect_groups") || "[]");
-      const userGroups = allGroups.filter(group => 
-        group.members?.some(member => member.email === user?.email) ||
-        group.owner_email === user?.email
-      );
+    const fetchUserGroups = async () => {
+      const userEmail = (user.email || '').toLowerCase();
+      let allGroups = [];
+      try {
+        const res = await groupsApi.getAll();
+        if (Array.isArray(res) && res.length > 0) {
+          allGroups = res;
+          localStorage.setItem("studyconnect_groups", JSON.stringify(res));
+        }
+      } catch (e) {}
+
+      if (allGroups.length === 0) {
+        allGroups = JSON.parse(localStorage.getItem("studyconnect_groups") || "[]");
+      }
+
+      const userGroups = allGroups.filter(group => {
+        const owner = (group.owner_email || group.ownerEmail || '').toLowerCase();
+        const isOwner = userEmail && owner === userEmail;
+        const isMember = (group.members || []).some(m => (m.email || m.userEmail || '').toLowerCase() === userEmail);
+        return isOwner || isMember;
+      });
+
       setGroups(userGroups);
       setLoading(false);
       
@@ -54,17 +71,41 @@ export default function GroupChat() {
     fetchUserGroups();
   }, [user, selectedGroup]);
 
-  // Load messages for selected group from shared storage
+  // Load messages for selected group
   useEffect(() => {
-    if (selectedGroup) {
-      console.log('GroupChat: Loading messages for group:', selectedGroup.id);
+    const loadGroupMessages = async () => {
+      if (!selectedGroup) {
+        setMessages([]);
+        return;
+      }
+
+      try {
+        const serverMessages = await chatApi.getHistory(selectedGroup.id, user?.email);
+        if (Array.isArray(serverMessages)) {
+          const formatted = serverMessages.map(m => ({
+            id: m.id,
+            senderEmail: m.senderEmail || m.sender_email,
+            senderName: m.senderName || m.sender_name || (m.senderEmail ? m.senderEmail.split('@')[0] : 'User'),
+            content: m.content || m.message || '',
+            timestamp: m.timestamp || new Date().toISOString(),
+            attachments: (m.fileUrl || m.file_url) ? [{
+              name: m.fileName || m.file_name || 'File',
+              type: m.fileType || m.file_type || '',
+              size: m.fileSize || m.file_size || 0,
+              url: m.fileUrl || m.file_url
+            }] : []
+          }));
+          setMessages(formatted);
+          return;
+        }
+      } catch (e) {}
+
       const storedMessages = JSON.parse(localStorage.getItem("studyconnect_group_messages") || "{}");
       const groupMessages = storedMessages[selectedGroup.id] || [];
-      console.log('GroupChat: Loaded messages:', groupMessages.length);
       setMessages(groupMessages);
-    } else {
-      setMessages([]);
-    }
+    };
+
+    loadGroupMessages();
   }, [selectedGroup]);
 
   // Save messages to shared storage when they change
@@ -241,6 +282,27 @@ export default function GroupChat() {
       } else {
         // Add new message
         setMessages(prev => [...prev, messageData]);
+
+        // Send to backend and broadcast via WebSocket
+        try {
+          chatApi.sendMessage({
+            groupId: selectedGroup.id,
+            senderEmail: user.email,
+            senderName: user.fullName || user.name || user.email.split('@')[0],
+            content: newMessage.trim(),
+            messageType: attachedFiles.length > 0 ? 'FILE' : 'TEXT'
+          }).catch(e => console.warn('Could not persist message to server:', e));
+
+          websocketService.sendMessage({
+            groupId: selectedGroup.id,
+            senderEmail: user.email,
+            senderName: user.fullName || user.name || user.email.split('@')[0],
+            content: newMessage.trim(),
+            messageType: attachedFiles.length > 0 ? 'FILE' : 'TEXT'
+          });
+        } catch (err) {
+          console.warn('Chat dispatch warning:', err);
+        }
       }
 
       setNewMessage('');

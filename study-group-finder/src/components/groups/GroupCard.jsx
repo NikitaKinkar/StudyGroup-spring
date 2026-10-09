@@ -7,7 +7,14 @@ export default function GroupCard({ group, user, onDelete, onView, onRequestJoin
   const maxMembers = group.max_members || group.maxMembers || 100;
   const fillPercentage = Math.min(100, Math.round((memberCount / maxMembers) * 100));
   
-  const userEmail = user?.email?.toLowerCase();
+  const activeUser = user || (() => {
+    try {
+      return JSON.parse(localStorage.getItem("studyconnect_user") || "null");
+    } catch (e) {
+      return null;
+    }
+  })();
+  const userEmail = activeUser?.email?.toLowerCase();
   const ownerEmail = (group.owner_email || group.ownerEmail || '').toLowerCase();
   const isOwner = userEmail && ownerEmail === userEmail;
   const isMember = isOwner || (group.members || []).some(m => {
@@ -120,13 +127,6 @@ export default function GroupCard({ group, user, onDelete, onView, onRequestJoin
             <MessageSquare className="w-3.5 h-3.5" />
             <span>Chat Room</span>
           </button>
-        ) : hasRequested() ? (
-          <button
-            disabled
-            className="flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 text-xs font-semibold px-3 py-1.5 rounded-xl cursor-not-allowed"
-          >
-            Requested
-          </button>
         ) : isFull ? (
           <button
             disabled
@@ -137,13 +137,9 @@ export default function GroupCard({ group, user, onDelete, onView, onRequestJoin
         ) : (
           <button
             onClick={() => onRequestJoin(group)}
-            className={`flex items-center gap-1.5 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 ${
-              group.visibility === "Private"
-                ? "bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700"
-                : "bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
-            }`}
+            className="flex items-center gap-1.5 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
           >
-            <span>{group.visibility === "Private" ? "Request Join" : "+ Join Group"}</span>
+            <span>+ Join Group</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         )}

@@ -9,7 +9,8 @@ RUN mvn clean package -DskipTests
 # Runtime stage
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-COPY --from=build /app/target/*.jar app.jar
+COPY --from=build /app/target/study-group-finder-backend-*.jar app.jar
 EXPOSE 8080
 ENV PORT=8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-Xmx384m", "-Xms256m", "-jar", "app.jar"]
+

@@ -281,7 +281,7 @@ export default function Dashboard() {
                         </div>
 
                         <a
-                          href={`/chat`}
+                          href={`/chat/${g.id}`}
                           className="flex items-center gap-1 text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg transition"
                         >
                           💬 Chat

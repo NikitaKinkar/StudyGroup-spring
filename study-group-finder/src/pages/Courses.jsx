@@ -77,7 +77,13 @@ const COURSES_DATA = [
 ];
 
 export default function Courses() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("studyconnect_user") || "null");
+    } catch (e) {
+      return null;
+    }
+  });
   const [enrolledCourses, setEnrolledCourses] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedLevel, setSelectedLevel] = useState("All");

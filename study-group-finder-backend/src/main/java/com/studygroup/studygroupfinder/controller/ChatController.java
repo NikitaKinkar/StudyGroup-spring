@@ -21,34 +21,51 @@ public class ChatController {
     }
 
     @MessageMapping("/chat.sendMessage")
-    @SendTo("/topic/group/{groupId}")
-    public ChatMessage sendMessage(@Payload Map<String, String> messagePayload, 
+    public ChatMessage sendMessage(@Payload Map<String, Object> messagePayload, 
                                   SimpMessageHeaderAccessor headerAccessor) {
         try {
-            Long groupId = Long.parseLong(messagePayload.get("groupId"));
-            String senderEmail = messagePayload.get("senderEmail");
-            String senderName = messagePayload.get("senderName");
-            String content = messagePayload.get("content");
+            Object rawGroupId = messagePayload.get("groupId");
+            if (rawGroupId == null) rawGroupId = messagePayload.get("group_id");
+            if (rawGroupId == null) return null;
+            Long groupId = Long.parseLong(String.valueOf(rawGroupId));
 
-            return chatService.sendMessage(groupId, senderEmail, senderName, content);
+            String senderEmail = (String) messagePayload.getOrDefault("senderEmail", messagePayload.get("sender_email"));
+            String senderName = (String) messagePayload.getOrDefault("senderName", messagePayload.get("sender_name"));
+            String content = (String) messagePayload.getOrDefault("content", messagePayload.get("message"));
+            String messageType = (String) messagePayload.getOrDefault("messageType", messagePayload.getOrDefault("type", "TEXT"));
+            String fileUrl = (String) messagePayload.getOrDefault("fileUrl", messagePayload.get("file_url"));
+            String fileName = (String) messagePayload.getOrDefault("fileName", messagePayload.get("file_name"));
+            String fileType = (String) messagePayload.getOrDefault("fileType", messagePayload.get("file_type"));
+            Long fileSize = null;
+            if (messagePayload.get("fileSize") != null) {
+                fileSize = Long.parseLong(String.valueOf(messagePayload.get("fileSize")));
+            }
+
+            return chatService.sendMessage(groupId, senderEmail, senderName, content, messageType, fileUrl, fileName, fileType, fileSize);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to send message: " + e.getMessage());
+            System.err.println("Failed to send message: " + e.getMessage());
+            return null;
         }
     }
 
     @MessageMapping("/chat.addUser")
-    @SendTo("/topic/group/{groupId}")
-    public ChatMessage addUser(@Payload Map<String, String> messagePayload,
+    public ChatMessage addUser(@Payload Map<String, Object> messagePayload,
                               SimpMessageHeaderAccessor headerAccessor) {
         try {
-            Long groupId = Long.parseLong(messagePayload.get("groupId"));
-            String senderName = messagePayload.get("senderName");
+            Object rawGroupId = messagePayload.get("groupId");
+            if (rawGroupId == null) rawGroupId = messagePayload.get("group_id");
+            if (rawGroupId == null) return null;
+            Long groupId = Long.parseLong(String.valueOf(rawGroupId));
+
+            String senderName = (String) messagePayload.getOrDefault("senderName", messagePayload.get("sender_name"));
+            if (senderName == null) senderName = "User";
 
             // Create a system message when user joins
             String content = senderName + " joined the chat";
             return chatService.sendMessage(groupId, "system", "System", content);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to add user: " + e.getMessage());
+            System.err.println("Failed to add user: " + e.getMessage());
+            return null;
         }
     }
 }

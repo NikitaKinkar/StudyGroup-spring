@@ -105,19 +105,11 @@ public class StudyGroupService {
             throw new RuntimeException("Group is full");
         }
 
-        // If Public, join immediately
-        boolean isPublic = group.getVisibility() == null || StudyGroup.Visibility.Public.equals(group.getVisibility());
-        if (isPublic) {
-            GroupMember member = new GroupMember(group, user.getEmail(), user.getFullName());
-            groupMemberRepository.save(member);
-            result.put("joined", true);
-            result.put("message", "Successfully joined the group!");
-        } else {
-            // Private group: create join request notification for owner
-            notificationService.createJoinRequestNotification(user, group);
-            result.put("joined", false);
-            result.put("message", "Join request sent to group owner");
-        }
+        // Direct join immediately without putting on request
+        GroupMember member = new GroupMember(group, user.getEmail(), user.getFullName());
+        groupMemberRepository.save(member);
+        result.put("joined", true);
+        result.put("message", "Successfully joined the group! Chat is now open.");
         return result;
     }
 

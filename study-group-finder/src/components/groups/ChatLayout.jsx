@@ -4,6 +4,14 @@ import { chatApi, groupsApi } from "@/services/api";
 import websocketService from "../../services/websocketService";
 
 const ChatLayout = ({ user, onClose, groupId }) => {
+  const activeUser = user || (() => {
+    try {
+      return JSON.parse(localStorage.getItem("studyconnect_user") || "null");
+    } catch (e) {
+      return null;
+    }
+  })();
+
   const [groups, setGroups] = useState([]);
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -24,11 +32,11 @@ const ChatLayout = ({ user, onClose, groupId }) => {
 
   // Load user's groups
   const loadGroups = async () => {
-    const userEmail = user?.email?.toLowerCase();
+    const userEmail = (activeUser?.email || '').toLowerCase();
     let allGroups = [];
     try {
       const serverGroups = await groupsApi.getAll();
-      if (Array.isArray(serverGroups)) {
+      if (Array.isArray(serverGroups) && serverGroups.length > 0) {
         allGroups = serverGroups;
         localStorage.setItem("studyconnect_groups", JSON.stringify(serverGroups));
       }
@@ -47,44 +55,76 @@ const ChatLayout = ({ user, onClose, groupId }) => {
       return isOwner || isMember;
     });
 
-    setGroups(userGroups);
-    setLoading(false);
-    
-    // Select specific group if groupId is provided, otherwise auto-select first group
-    if (userGroups.length > 0 && !selectedGroup) {
-      if (groupId && groupId !== "all") {
-        const specificGroup = userGroups.find(g => String(g.id) === String(groupId));
-        if (specificGroup) {
-          setSelectedGroup(specificGroup);
-        } else {
-          setSelectedGroup(userGroups[0]);
+    const displayList = userGroups.length > 0 ? [...userGroups] : [...allGroups];
+
+    // If groupId is passed, make sure it is chosen and present in the list
+    if (groupId && groupId !== "all") {
+      const target = allGroups.find(g => String(g.id) === String(groupId)) ||
+                     displayList.find(g => String(g.id) === String(groupId));
+      if (target) {
+        setSelectedGroup(target);
+        if (!displayList.some(g => String(g.id) === String(target.id))) {
+          displayList.unshift(target);
         }
-      } else {
-        setSelectedGroup(userGroups[0]);
+      } else if (displayList.length > 0 && !selectedGroup) {
+        setSelectedGroup(displayList[0]);
       }
+    } else if (displayList.length > 0 && !selectedGroup) {
+      setSelectedGroup(displayList[0]);
     }
+
+    setGroups(displayList);
+    setLoading(false);
   };
 
   useEffect(() => {
-    if (user) {
-      loadGroups();
-    }
-  }, [user]);
+    loadGroups();
+  }, [groupId, activeUser?.email]);
 
   useEffect(() => {
-    if (selectedGroup) {
+    if (selectedGroup && activeUser) {
       loadMessages();
+      const userName = activeUser.fullName || activeUser.name || activeUser.email.split('@')[0];
+      websocketService.connect(
+        selectedGroup.id,
+        activeUser.email,
+        userName,
+        (incomingMsg) => {
+          if (!incomingMsg) return;
+          const incomingGroupId = String(incomingMsg.groupId || incomingMsg.group_id || '');
+          if (incomingGroupId && incomingGroupId !== String(selectedGroup.id)) return;
+
+          setMessages(prev => {
+            const alreadyExists = prev.some(m =>
+              (incomingMsg.id && String(m.id) === String(incomingMsg.id)) ||
+              (m.content === (incomingMsg.content || incomingMsg.message) &&
+               m.senderEmail === (incomingMsg.senderEmail || incomingMsg.sender_email) &&
+               Math.abs(new Date(m.timestamp) - new Date(incomingMsg.timestamp)) < 2000)
+            );
+            if (alreadyExists) return prev;
+            return [...prev, {
+              ...incomingMsg,
+              id: incomingMsg.id || Date.now().toString(),
+              content: incomingMsg.content || incomingMsg.message || '',
+              senderEmail: incomingMsg.senderEmail || incomingMsg.sender_email,
+              senderName: incomingMsg.senderName || incomingMsg.sender_name || (incomingMsg.senderEmail ? incomingMsg.senderEmail.split('@')[0] : 'User'),
+              timestamp: incomingMsg.timestamp || new Date().toISOString()
+            }];
+          });
+        }
+      );
+
       const interval = setInterval(loadMessages, 3000);
       return () => clearInterval(interval);
     }
-  }, [selectedGroup]);
+  }, [selectedGroup?.id, activeUser?.email]);
 
   // Load messages for passed group
   const loadMessages = async () => {
     if (!selectedGroup) return;
 
     try {
-      const serverMessages = await chatApi.getHistory(selectedGroup.id, user.email);
+      const serverMessages = await chatApi.getHistory(selectedGroup.id, activeUser?.email || '');
       if (Array.isArray(serverMessages)) {
         const formatted = serverMessages.map(m => ({
           id: m.id,
@@ -119,25 +159,24 @@ const ChatLayout = ({ user, onClose, groupId }) => {
   };
 
   useEffect(() => {
-    if (user) {
-      loadGroups();
-    }
-  }, [user]);
-
-  useEffect(() => {
     loadMessages();
   }, [selectedGroup]);
 
   // Set selectedGroup when groupId prop changes
   useEffect(() => {
-    if (groupId && groups.length > 0) {
-      const group = groups.find(g => g.id === groupId);
-      if (group) {
-        setSelectedGroup(group);
-        loadMessages();
+    if (groupId) {
+      if (groupId === "all") {
+        if (!selectedGroup && groups.length > 0) setSelectedGroup(groups[0]);
+        return;
+      }
+      const allStored = JSON.parse(localStorage.getItem("studyconnect_groups") || "[]");
+      const pool = [...groups, ...allStored];
+      const found = pool.find(g => String(g.id) === String(groupId));
+      if (found) {
+        setSelectedGroup(found);
       }
     }
-  }, [groupId, groups]);
+  }, [groupId, groups.length]);
 
   useEffect(() => {
     // Scroll to bottom when new messages arrive
@@ -152,7 +191,7 @@ const ChatLayout = ({ user, onClose, groupId }) => {
 
   // Get user's full name for display
   const getUserFullName = () => {
-    return user.fullName || user.name || 'User';
+    return activeUser?.fullName || activeUser?.name || activeUser?.email?.split('@')[0] || 'User';
   };
 
   // Get sender name with overrides
@@ -279,8 +318,8 @@ const ChatLayout = ({ user, onClose, groupId }) => {
 
     const payload = {
       groupId: selectedGroup.id,
-      senderEmail: user.email,
-      senderName: getSenderName(user.email),
+      senderEmail: activeUser?.email || '',
+      senderName: getSenderName(activeUser?.email || ''),
       content: newMessage.trim() || (fileName ? `📎 ${fileName}` : ''),
       messageType: selectedFile ? 'FILE' : 'TEXT',
       fileUrl: fileUrl,
@@ -311,8 +350,8 @@ const ChatLayout = ({ user, onClose, groupId }) => {
       // Send file message
       const newMsg = {
         id: Date.now().toString(),
-        senderEmail: user.email,
-        senderName: getSenderName(user.email),
+        senderEmail: activeUser?.email || '',
+        senderName: getSenderName(activeUser?.email || ''),
         group_id: `group_${selectedGroup.id}`,
         groupId: selectedGroup.id,
         group_name: selectedGroup.name,
@@ -342,8 +381,8 @@ const ChatLayout = ({ user, onClose, groupId }) => {
       // Send text message
       const newMsg = {
         id: Date.now().toString(),
-        senderEmail: user.email,
-        senderName: getSenderName(user.email),
+        senderEmail: activeUser?.email || '',
+        senderName: getSenderName(activeUser?.email || ''),
         group_id: `group_${selectedGroup.id}`,
         groupId: selectedGroup.id,
         group_name: selectedGroup.name,
@@ -484,7 +523,17 @@ const ChatLayout = ({ user, onClose, groupId }) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  if (!user) return null;
+  if (!activeUser) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50 font-sans">
+        <div className="text-center p-6 bg-white rounded-2xl shadow-sm border border-slate-200">
+          <MessageCircle className="w-10 h-10 text-orange-500 mx-auto mb-3" />
+          <p className="text-sm font-bold text-slate-700">Please sign in to access the study group chat.</p>
+          <button onClick={onClose} className="mt-3 text-xs text-orange-600 hover:underline">Close</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-slate-50 font-sans">
@@ -631,15 +680,15 @@ const ChatLayout = ({ user, onClose, groupId }) => {
                   {messages.map((msg) => (
                     <div
                       key={msg.id}
-                      className={`flex ${msg.senderEmail === user.email ? 'justify-end' : 'justify-start'}`}
+                      className={`flex ${msg.senderEmail === activeUser?.email ? 'justify-end' : 'justify-start'}`}
                     >
                       <div className={`max-w-xs lg:max-w-md ${
-                        msg.senderEmail === user.email
+                        msg.senderEmail === activeUser?.email
                           ? 'order-2'
                           : 'order-1'
                       }`}>
                         {/* Sender name for other users' messages */}
-                        {msg.senderEmail !== user.email && (
+                        {msg.senderEmail !== activeUser?.email && (
                           <p className="text-xs font-semibold text-gray-600 mb-1">
                             {msg.senderName}
                           </p>
@@ -657,7 +706,7 @@ const ChatLayout = ({ user, onClose, groupId }) => {
                         )}
                         
                         <div className={`px-4 py-2.5 rounded-2xl relative shadow-xs ${
-                          msg.senderEmail === user.email
+                          msg.senderEmail === activeUser?.email
                             ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-tr-xs'
                             : 'bg-white text-slate-800 border border-slate-200/80 rounded-tl-xs'
                         }`}>
@@ -665,7 +714,7 @@ const ChatLayout = ({ user, onClose, groupId }) => {
                           <button
                             onClick={() => setActiveMenu(activeMenu === msg.id ? null : msg.id)}
                             className={`absolute top-2 right-2 p-1 rounded-full hover:bg-black/10 transition-colors ${
-                              msg.senderEmail === user.email ? 'text-white/70 hover:text-white' : 'text-gray-400 hover:text-gray-600'
+                              msg.senderEmail === activeUser?.email ? 'text-white/70 hover:text-white' : 'text-gray-400 hover:text-gray-600'
                             }`}
                           >
                             <MoreVertical className="w-4 h-4" />
@@ -674,7 +723,7 @@ const ChatLayout = ({ user, onClose, groupId }) => {
                           {/* Dropdown menu */}
                           {activeMenu === msg.id && (
                             <div className={`absolute top-8 right-2 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10 ${
-                              msg.senderEmail === user.email ? 'right-0' : 'right-0'
+                              msg.senderEmail === activeUser?.email ? 'right-0' : 'right-0'
                             }`}>
                               <button
                                 onClick={() => handleReply(msg)}
@@ -683,7 +732,7 @@ const ChatLayout = ({ user, onClose, groupId }) => {
                                 <Reply className="w-4 h-4" />
                                 <span>Reply</span>
                               </button>
-                              {msg.senderEmail === user.email && (
+                              {msg.senderEmail === activeUser?.email && (
                                 <>
                                   <div className="border-t border-gray-100 my-1"></div>
                                   <button

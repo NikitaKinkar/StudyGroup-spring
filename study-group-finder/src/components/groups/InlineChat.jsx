@@ -5,6 +5,13 @@ import chatService from '../../services/chatService';
 import { chatApi } from '@/services/api';
 
 const InlineChat = ({ group, user, onClose, isInLayout = false, isCourseChat = false, courseInfo = null }) => {
+  const activeUser = user || (() => {
+    try {
+      return JSON.parse(localStorage.getItem("studyconnect_user") || "null");
+    } catch (e) {
+      return null;
+    }
+  })();
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [isConnected, setIsConnected] = useState(true); // Always online for demo
@@ -40,13 +47,13 @@ const InlineChat = ({ group, user, onClose, isInLayout = false, isCourseChat = f
     const users = JSON.parse(localStorage.getItem("studyconnect_users") || "[]");
     
     // Check if this is the current user first
-    if (user && user.email === userEmail) {
-      // Force return fullName if available, otherwise name, then username
-      if (user.fullName) {
-        return user.fullName;
+    const currentUserObj = activeUser || user;
+    if (currentUserObj && currentUserObj.email === userEmail) {
+      if (currentUserObj.fullName) {
+        return currentUserObj.fullName;
       }
-      if (user.name) {
-        return user.name;
+      if (currentUserObj.name) {
+        return currentUserObj.name;
       }
       return userEmail.split('@')[0] || 'User';
     }
@@ -100,7 +107,7 @@ const InlineChat = ({ group, user, onClose, isInLayout = false, isCourseChat = f
     if (!group) return;
 
     try {
-      const serverMessages = await chatApi.getHistory(group.id, user?.email);
+      const serverMessages = await chatApi.getHistory(group.id, activeUser?.email);
       if (Array.isArray(serverMessages)) {
         const formatted = serverMessages.map(m => ({
           id: m.id,
@@ -141,14 +148,44 @@ const InlineChat = ({ group, user, onClose, isInLayout = false, isCourseChat = f
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Load messages on component mount + poll every 3 seconds
+  // Connect WebSocket for real-time group chat
   useEffect(() => {
-    if (user && group) {
+    if (activeUser && group) {
       loadMessages();
+      const userName = activeUser.fullName || activeUser.name || activeUser.email.split('@')[0];
+      websocketService.connect(
+        group.id,
+        activeUser.email,
+        userName,
+        (incomingMsg) => {
+          if (!incomingMsg) return;
+          const incomingGroupId = String(incomingMsg.groupId || incomingMsg.group_id || '');
+          if (incomingGroupId && incomingGroupId !== String(group.id)) return;
+
+          setMessages(prev => {
+            const alreadyExists = prev.some(m =>
+              (incomingMsg.id && String(m.id) === String(incomingMsg.id)) ||
+              (m.content === (incomingMsg.content || incomingMsg.message) &&
+               m.senderEmail === (incomingMsg.senderEmail || incomingMsg.sender_email) &&
+               Math.abs(new Date(m.timestamp) - new Date(incomingMsg.timestamp)) < 2000)
+            );
+            if (alreadyExists) return prev;
+            return [...prev, {
+              ...incomingMsg,
+              id: incomingMsg.id || Date.now().toString(),
+              content: incomingMsg.content || incomingMsg.message || '',
+              senderEmail: incomingMsg.senderEmail || incomingMsg.sender_email,
+              sender_name: incomingMsg.senderName || incomingMsg.sender_name || (incomingMsg.senderEmail ? incomingMsg.senderEmail.split('@')[0] : 'User'),
+              timestamp: incomingMsg.timestamp || new Date().toISOString()
+            }];
+          });
+        }
+      );
+
       const interval = setInterval(loadMessages, 3000);
       return () => clearInterval(interval);
     }
-  }, [user, group]);
+  }, [activeUser?.email, group?.id]);
 
   // Listen for storage changes from other tabs
   useEffect(() => {
@@ -166,15 +203,15 @@ const InlineChat = ({ group, user, onClose, isInLayout = false, isCourseChat = f
   }, [group]);
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !user || !group) return;
+    if (!newMessage.trim() || !activeUser || !group) return;
 
     const messageText = newMessage.trim();
     setNewMessage('');
 
     const optimisticMessage = {
       id: Date.now().toString(),
-      senderEmail: user.email,
-      sender_name: user.fullName || user.name || user.email.split('@')[0],
+      senderEmail: activeUser.email,
+      sender_name: activeUser.fullName || activeUser.name || activeUser.email.split('@')[0],
       group_id: group.id,
       groupId: group.id,
       group_name: group.name,
@@ -200,8 +237,8 @@ const InlineChat = ({ group, user, onClose, isInLayout = false, isCourseChat = f
     try {
       await chatApi.sendMessage({
         groupId: group.id,
-        senderEmail: user.email,
-        senderName: user.fullName || user.name || user.email.split('@')[0],
+        senderEmail: activeUser.email,
+        senderName: activeUser.fullName || activeUser.name || activeUser.email.split('@')[0],
         message: messageText,
         content: messageText,
         messageType: 'TEXT'
@@ -245,7 +282,12 @@ const InlineChat = ({ group, user, onClose, isInLayout = false, isCourseChat = f
       };
       
       localStorage.setItem("studyconnect_messages", JSON.stringify(allMessages));
-      setMessages([...allMessages]);
+      const groupFiltered = allMessages.filter(msg => 
+        String(msg.group_id) === String(group.id) ||
+        String(msg.group_id) === `group_${group.id}` ||
+        String(msg.groupId) === String(group.id)
+      );
+      setMessages(groupFiltered);
     }
     
     setEditingMessage(null);
@@ -263,7 +305,12 @@ const InlineChat = ({ group, user, onClose, isInLayout = false, isCourseChat = f
       const filteredMessages = allMessages.filter(m => m.id !== messageId);
       
       localStorage.setItem("studyconnect_messages", JSON.stringify(filteredMessages));
-      setMessages(filteredMessages);
+      const groupFiltered = filteredMessages.filter(msg => 
+        String(msg.group_id) === String(group.id) ||
+        String(msg.group_id) === `group_${group.id}` ||
+        String(msg.groupId) === String(group.id)
+      );
+      setMessages(groupFiltered);
       setSelectedMessages(new Set());
       setShowDeleteOptions(false);
     }
@@ -285,7 +332,12 @@ const InlineChat = ({ group, user, onClose, isInLayout = false, isCourseChat = f
       const filteredMessages = allMessages.filter(m => !selectedMessages.has(m.id));
       
       localStorage.setItem("studyconnect_messages", JSON.stringify(filteredMessages));
-      setMessages(filteredMessages);
+      const groupFiltered = filteredMessages.filter(msg => 
+        String(msg.group_id) === String(group.id) ||
+        String(msg.group_id) === `group_${group.id}` ||
+        String(msg.groupId) === String(group.id)
+      );
+      setMessages(groupFiltered);
       setSelectedMessages(new Set());
       setShowDeleteOptions(false);
     }

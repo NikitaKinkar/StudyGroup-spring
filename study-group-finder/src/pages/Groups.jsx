@@ -17,7 +17,13 @@ const COURSES = ["All Courses", "CSE(AIML)", "CSE(DS)", "CSE(Cyber)", "ECE", "EE
 
 export default function Groups() {
   const { groupId: urlGroupId } = useParams();
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("studyconnect_user") || "null");
+    } catch (e) {
+      return null;
+    }
+  });
   const [groups, setGroups] = useState([]);
   const [search, setSearch] = useState("");
   const [courseFilter, setCourseFilter] = useState("All Courses");
@@ -75,54 +81,43 @@ export default function Groups() {
   };
 
   const handleRequestJoin = async (group) => {
-    if (!user) return;
+    if (!user) {
+      alert("Please log in to join groups.");
+      return;
+    }
 
     try {
-      const res = await groupsApi.requestJoin(group.id);
-      if (res && res.joined) {
-        alert(res.message || "You have successfully joined the group! You can now participate in discussions.");
-      } else {
-        alert(res?.message || "Join request sent to group owner!");
-      }
-      await loadGroups();
-      return;
+      await groupsApi.requestJoin(group.id);
     } catch (err) {
-      console.warn("Backend join request error, updating locally:", err.message);
-      const errMsg = err.response?.data?.error || err.response?.data?.message;
-      if (errMsg) {
-        alert(errMsg);
-        return;
-      }
+      console.warn("Backend join request error, proceeding with local update:", err.message);
     }
 
-    // Local fallback
-    const notifications = JSON.parse(localStorage.getItem("studyconnect_notifications") || "[]");
-    const existingRequest = notifications.find(n => 
-      n.type === 'group_join_request' &&
-      n.sender_email === user.email &&
-      n.group_id === group.id
-    );
-    
-    if (existingRequest) {
-      alert("Connection request already sent!");
-      return;
-    }
-
-    const notification = {
-      id: Date.now(),
-      type: 'group_join_request',
-      sender_email: user.email,
-      sender_name: user.full_name,
-      group_id: group.id,
-      group_name: group.name,
-      message: `${user.full_name} wants to join your group`,
-      timestamp: new Date().toISOString(),
-      read: false
+    // Immediately add user to the group members
+    const newMember = {
+      name: user.full_name || user.fullName || user.name || user.email.split('@')[0],
+      email: user.email,
+      role: "Member"
     };
-    
-    notifications.push(notification);
-    localStorage.setItem("studyconnect_notifications", JSON.stringify(notifications));
-    alert("Join request sent to group owner!");
+
+    const allGroups = JSON.parse(localStorage.getItem("studyconnect_groups") || "[]");
+    const updatedGroups = allGroups.map(g => {
+      if (String(g.id) === String(group.id)) {
+        const currentMembers = g.members || [];
+        const alreadyIn = currentMembers.some(m => (m.email || m.userEmail || '').toLowerCase() === user.email.toLowerCase());
+        return {
+          ...g,
+          members: alreadyIn ? currentMembers : [...currentMembers, newMember]
+        };
+      }
+      return g;
+    });
+
+    localStorage.setItem("studyconnect_groups", JSON.stringify(updatedGroups));
+    await loadGroups();
+
+    alert(`Successfully joined "${group.name}"! Opening chat room now...`);
+    // Immediately open the chat room for this group
+    setChatGroupId(group.id);
   };
 
   const handleCreate = async (newGroup) => {
@@ -421,22 +416,17 @@ export default function Groups() {
         <CreateGroupModal onClose={() => setShowCreate(false)} onCreate={handleCreate} />
       )}
       
-      {showCourseGroupChat && (
+      {chatGroupId && (
         <div className="fixed inset-0 bg-white z-50 flex flex-col h-screen">
           <ChatLayout 
             user={user} 
             groupId={chatGroupId}
-            onClose={() => setShowCourseGroupChat(false)} 
-          />
-        </div>
-      )}
-      
-      {chatGroupId && !autoOpenChat && !openCourseGroupChat && (
-        <div className="fixed inset-0 bg-white z-50 flex flex-col h-screen">
-          <ChatLayout 
-            user={user} 
-            onClose={() => setChatGroupId(null)} 
-            groupId={chatGroupId}
+            onClose={() => {
+              setChatGroupId(null);
+              setShowCourseGroupChat(false);
+              setAutoOpenChat(false);
+              setOpenCourseGroupChat(false);
+            }} 
           />
         </div>
       )}
