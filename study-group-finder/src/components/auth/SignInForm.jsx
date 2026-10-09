@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Eye, EyeOff, Mail, Lock, ArrowRight, Sparkles } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, ArrowRight } from "lucide-react";
 
 export default function SignInForm({ onSignIn, onSwitch, onForgotPassword }) {
   const [email, setEmail] = useState("");
@@ -86,20 +86,6 @@ export default function SignInForm({ onSignIn, onSwitch, onForgotPassword }) {
           <span>{isSubmitting ? "Signing In..." : "Sign In to Hub"}</span>
           <ArrowRight className="w-4 h-4" />
         </button>
-
-        {/* 1-Click Quick Demo Login */}
-        <div className="pt-2">
-          <button
-            type="button"
-            onClick={() => {
-              onSignIn({ email: "dineshmatti707@gmail.com", password: "password123" });
-            }}
-            className="w-full py-2.5 px-4 rounded-xl border border-dashed border-orange-300 bg-orange-50/60 hover:bg-orange-100/70 text-orange-700 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-orange-500" />
-            <span>Quick Demo Sign In (1-Click)</span>
-          </button>
-        </div>
       </form>
 
       <p className="text-xs text-slate-500 mt-6 text-center">
