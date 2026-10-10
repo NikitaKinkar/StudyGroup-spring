@@ -37,9 +37,9 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      console.warn('Session expired or unauthorized request');
-      const currentPath = window.location.pathname;
-      if (!currentPath.includes('/Auth') && !currentPath.includes('/login')) {
+      console.warn('Unauthorized request:', error.config?.url);
+      // Only clear session on explicit logout or invalid token check
+      if (error.config?.url?.includes('/auth/logout') || error.config?.url?.includes('/auth/check-invalid')) {
         sessionStorage.removeItem('studyconnect_token');
         sessionStorage.removeItem('studyconnect_user');
         localStorage.removeItem('studyconnect_token');

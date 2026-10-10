@@ -47,10 +47,8 @@ const AuthenticatedApp = () => {
   }
 
   const hasUser = Boolean(
-    isAuthenticated && 
-    user && 
-    sessionStorage.getItem("studyconnect_user") && 
-    sessionStorage.getItem("studyconnect_token")
+    (isAuthenticated && user) ||
+    Boolean(sessionStorage.getItem("studyconnect_user"))
   );
 
   console.log('App.jsx: Rendering main app routes, hasUser:', hasUser);

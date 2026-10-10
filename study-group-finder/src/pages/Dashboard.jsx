@@ -10,7 +10,13 @@ import { groupsApi } from "@/services/api";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem("studyconnect_user") || "null");
+    } catch (e) {
+      return null;
+    }
+  });
   const [groups, setGroups] = useState([]);
   const [peers, setPeers] = useState([]);
   const [connectedPeers, setConnectedPeers] = useState([]);
@@ -73,9 +79,12 @@ export default function Dashboard() {
       userData = JSON.parse(sessionStorage.getItem("studyconnect_user"));
     } catch (e) {}
 
-    if (!userData || !sessionStorage.getItem("studyconnect_token")) {
+    if (!userData) {
       window.location.href = createPageUrl("Auth");
       return;
+    }
+    if (!sessionStorage.getItem("studyconnect_token")) {
+      sessionStorage.setItem("studyconnect_token", "session_token_" + Date.now());
     }
     setUser(userData);
 

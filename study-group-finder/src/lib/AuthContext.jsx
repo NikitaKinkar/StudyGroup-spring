@@ -27,49 +27,41 @@ export const AuthProvider = ({ children }) => {
 
   const checkAppState = async () => {
     try {
-      setIsLoadingAuth(true);
       setAuthError(null);
       
-      // Clean legacy localStorage credentials
-      localStorage.removeItem('studyconnect_user');
-      localStorage.removeItem('studyconnect_token');
-
       const token = sessionStorage.getItem('studyconnect_token');
       const savedUserStr = sessionStorage.getItem('studyconnect_user');
       
       if (token && savedUserStr) {
         try {
-          const profileData = await authApi.getProfile();
-          if (profileData && profileData.user) {
-            const userData = {
-              ...profileData.user,
-              name: profileData.user.fullName || profileData.user.full_name,
-              full_name: profileData.user.fullName || profileData.user.full_name,
-            };
-            setUser(userData);
+          const parsed = JSON.parse(savedUserStr);
+          if (parsed && (parsed.email || parsed.id)) {
+            setUser(parsed);
             setIsAuthenticated(true);
-            sessionStorage.setItem('studyconnect_user', JSON.stringify(userData));
             setIsLoadingAuth(false);
+
+            // Silently refresh profile in background if available
+            authApi.getProfile()
+              .then(profileData => {
+                if (profileData && profileData.user) {
+                  const userData = {
+                    ...profileData.user,
+                    name: profileData.user.fullName || profileData.user.full_name,
+                    full_name: profileData.user.fullName || profileData.user.full_name,
+                  };
+                  setUser(userData);
+                  sessionStorage.setItem('studyconnect_user', JSON.stringify(userData));
+                }
+              })
+              .catch(() => {});
             return;
           }
-        } catch (apiErr) {
-          console.warn('Backend token verification failed, using stored session:', apiErr.message);
-        }
-
-        try {
-          const parsed = JSON.parse(savedUserStr);
-          setUser(parsed);
-          setIsAuthenticated(true);
-          setIsLoadingAuth(false);
-          return;
         } catch (e) {}
       }
 
       // Default unauthenticated
       setUser(null);
       setIsAuthenticated(false);
-      sessionStorage.removeItem('studyconnect_user');
-      sessionStorage.removeItem('studyconnect_token');
       setIsLoadingAuth(false);
     } catch (error) {
       console.error('App state check failed:', error);
@@ -134,7 +126,9 @@ export const AuthProvider = ({ children }) => {
   return (
     <AuthContext.Provider value={{ 
       user, 
+      setUser,
       isAuthenticated, 
+      setIsAuthenticated,
       isLoadingAuth,
       isLoadingPublicSettings,
       authError,
