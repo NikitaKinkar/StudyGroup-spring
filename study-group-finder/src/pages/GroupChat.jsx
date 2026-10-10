@@ -27,10 +27,12 @@ export default function GroupChat() {
 
   useEffect(() => {
     // Load user data
-    const userData = JSON.parse(localStorage.getItem("studyconnect_user"));
-    if (userData) {
-      setUser(userData);
-    }
+    try {
+      const userData = JSON.parse(sessionStorage.getItem("studyconnect_user") || localStorage.getItem("studyconnect_user") || "null");
+      if (userData) {
+        setUser(userData);
+      }
+    } catch (e) {}
   }, []);
 
   useEffect(() => {

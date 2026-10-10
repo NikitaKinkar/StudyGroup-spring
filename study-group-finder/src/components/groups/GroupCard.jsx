@@ -9,7 +9,7 @@ export default function GroupCard({ group, user, onDelete, onView, onRequestJoin
   
   const activeUser = user || (() => {
     try {
-      return JSON.parse(localStorage.getItem("studyconnect_user") || "null");
+      return JSON.parse(sessionStorage.getItem("studyconnect_user") || localStorage.getItem("studyconnect_user") || "null");
     } catch (e) {
       return null;
     }
