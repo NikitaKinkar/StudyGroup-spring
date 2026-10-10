@@ -16,10 +16,7 @@ export default function Dashboard() {
   const [connectedPeers, setConnectedPeers] = useState([]);
 
   const handleCourseChatNavigation = () => {
-    console.log('Dashboard: Course chat icon clicked, opening course group chat page directly');
-    // Navigate to Groups page with course group chat trigger
-    navigate('/Groups?openCourseGroupChat=true');
-    console.log('Dashboard: Course chat navigation called');
+    navigate('/chat');
   };
 
   const handleConnectPeer = (peer) => {
@@ -84,12 +81,13 @@ export default function Dashboard() {
 
     // Load groups from backend with fallback
     const fetchGroups = async () => {
+      const userEmail = (userData?.email || '').toLowerCase();
       try {
         const data = await groupsApi.getAll();
         if (Array.isArray(data)) {
           const userGroups = data.filter(g => 
-            (g.ownerEmail || g.owner_email) === userData?.email || 
-            (g.members || []).some(m => (m.email || m.userEmail) === userData?.email)
+            (g.ownerEmail || g.owner_email || '').toLowerCase() === userEmail || 
+            (g.members || []).some(m => (m.email || m.userEmail || '').toLowerCase() === userEmail)
           );
           setGroups(userGroups);
           return;
@@ -100,8 +98,8 @@ export default function Dashboard() {
 
       const allGroups = JSON.parse(localStorage.getItem("studyconnect_groups") || "[]");
       const userGroups = allGroups.filter(g => 
-        (g.owner_email || g.ownerEmail) === userData?.email || 
-        (g.members || []).some(m => (m.email || m.userEmail) === userData?.email)
+        (g.owner_email || g.ownerEmail || '').toLowerCase() === userEmail || 
+        (g.members || []).some(m => (m.email || m.userEmail || '').toLowerCase() === userEmail)
       );
       setGroups(userGroups);
     };
@@ -154,7 +152,7 @@ export default function Dashboard() {
 
             <div className="relative z-10 max-w-2xl">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-white/20 backdrop-blur-md text-white mb-3">
-                ✨ Welcome to StudyConnect Hub
+                ✨ Welcome to StudyConnect
               </span>
               <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight text-white mb-2 leading-tight">
                 Hey {user?.full_name?.split(" ")[0] || "Scholar"}! Ready to crush your study goals?
@@ -351,14 +349,14 @@ export default function Dashboard() {
       </div>
       <ChatNotificationBar user={user} />
       
-      {/* Floating Chat Button */}
+      {/* Floating Course Chat Button */}
       <button
         onClick={handleCourseChatNavigation}
-        className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 text-white rounded-full p-4 shadow-xl shadow-orange-500/25 transition-all duration-300 hover:scale-110 hover:shadow-2xl group flex items-center gap-2"
-        title="Open Group Chat"
+        className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 text-white rounded-full p-4 shadow-xl shadow-orange-500/25 transition-all duration-300 hover:scale-110 hover:shadow-2xl group flex items-center gap-2 cursor-pointer"
+        title="Open Course Chat"
       >
-        <Users className="w-5 h-5 transition-transform duration-300 group-hover:rotate-12" />
-        <span className="text-xs font-bold pr-1">Chat Hub</span>
+        <BookOpen className="w-5 h-5 transition-transform duration-300 group-hover:rotate-12" />
+        <span className="text-xs font-bold pr-1">Course Chat</span>
       </button>
     </div>
   );

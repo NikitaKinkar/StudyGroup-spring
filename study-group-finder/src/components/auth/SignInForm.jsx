@@ -83,7 +83,7 @@ export default function SignInForm({ onSignIn, onSwitch, onForgotPassword }) {
           disabled={isSubmitting}
           className="w-full mt-2 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white font-bold py-3 rounded-xl shadow-md shadow-orange-500/25 tracking-wide text-sm flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-70 cursor-pointer"
         >
-          <span>{isSubmitting ? "Signing In..." : "Sign In to Hub"}</span>
+          <span>{isSubmitting ? "Signing In..." : "Sign In"}</span>
           <ArrowRight className="w-4 h-4" />
         </button>
       </form>

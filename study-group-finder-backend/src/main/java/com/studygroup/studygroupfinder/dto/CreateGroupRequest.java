@@ -5,13 +5,12 @@ import jakarta.validation.constraints.Size;
 
 public class CreateGroupRequest {
     @NotBlank(message = "Group name is required")
-    @Size(min = 3, max = 100, message = "Group name must be between 3 and 100 characters")
+    @Size(min = 1, max = 150, message = "Group name must be between 1 and 150 characters")
     private String name;
 
-    private String description;
+    private String description = "";
 
-    @NotBlank(message = "Course is required")
-    private String courseName;
+    private String courseName = "General";
 
     private Integer maxMembers = 100;
 

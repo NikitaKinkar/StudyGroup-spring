@@ -25,9 +25,6 @@ export default function TopBar({ user, extraContent }) {
             <span className="font-extrabold text-xl tracking-tight text-slate-900 group-hover:text-orange-600 transition-colors">
               Study<span className="text-orange-500">Connect</span>
             </span>
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700 tracking-wide">
-              <Sparkles className="w-2.5 h-2.5" /> HUB
-            </span>
           </div>
           <p className="text-[11px] font-medium text-slate-400 tracking-wide">Learn • Collaborate • Excel</p>
         </div>

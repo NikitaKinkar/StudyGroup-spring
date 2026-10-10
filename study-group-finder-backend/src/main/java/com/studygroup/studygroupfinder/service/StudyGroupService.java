@@ -32,19 +32,40 @@ public class StudyGroupService {
 
     public StudyGroup createGroup(CreateGroupRequest request, User owner) {
         StudyGroup group = new StudyGroup();
-        group.setName(request.getName());
-        group.setDescription(request.getDescription());
-        group.setCourseName(request.getCourseName());
-        group.setMaxMembers(request.getMaxMembers());
-        group.setVisibility(StudyGroup.Visibility.valueOf(request.getVisibility()));
-        group.setOwnerEmail(owner.getEmail());
-        group.setOwnerName(owner.getFullName());
+        String groupName = (request.getName() != null && !request.getName().trim().isEmpty())
+                ? request.getName().trim()
+                : "New Study Group";
+        group.setName(groupName);
+        group.setDescription(request.getDescription() != null ? request.getDescription().trim() : "");
+        group.setCourseName((request.getCourseName() != null && !request.getCourseName().trim().isEmpty()) 
+                ? request.getCourseName().trim() 
+                : "General");
+        group.setMaxMembers(request.getMaxMembers() != null && request.getMaxMembers() > 0 ? request.getMaxMembers() : 100);
+
+        StudyGroup.Visibility vis = StudyGroup.Visibility.Public;
+        if (request.getVisibility() != null) {
+            try {
+                if (request.getVisibility().equalsIgnoreCase("private")) {
+                    vis = StudyGroup.Visibility.Private;
+                } else {
+                    vis = StudyGroup.Visibility.Public;
+                }
+            } catch (Exception ignored) {}
+        }
+        group.setVisibility(vis);
+
+        String ownerEmail = (owner != null && owner.getEmail() != null) ? owner.getEmail() : "student@campus.edu";
+        String ownerName = (owner != null && owner.getFullName() != null && !owner.getFullName().trim().isEmpty())
+                ? owner.getFullName()
+                : ownerEmail.split("@")[0];
+        group.setOwnerEmail(ownerEmail);
+        group.setOwnerName(ownerName);
 
         // Save the group first
         StudyGroup savedGroup = studyGroupRepository.save(group);
 
         // Add owner as a member
-        GroupMember ownerMember = new GroupMember(savedGroup, owner.getEmail(), owner.getFullName(), GroupMember.Role.Owner);
+        GroupMember ownerMember = new GroupMember(savedGroup, ownerEmail, ownerName, GroupMember.Role.Owner);
         groupMemberRepository.save(ownerMember);
 
         return savedGroup;

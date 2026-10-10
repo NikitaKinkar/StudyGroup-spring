@@ -59,15 +59,32 @@ const ChatLayout = ({ user, onClose, groupId }) => {
 
     // If groupId is passed, make sure it is chosen and present in the list
     if (groupId && groupId !== "all") {
-      const target = allGroups.find(g => String(g.id) === String(groupId)) ||
-                     displayList.find(g => String(g.id) === String(groupId));
-      if (target) {
-        setSelectedGroup(target);
-        if (!displayList.some(g => String(g.id) === String(target.id))) {
-          displayList.unshift(target);
-        }
-      } else if (displayList.length > 0 && !selectedGroup) {
-        setSelectedGroup(displayList[0]);
+      let target = allGroups.find(g => String(g.id) === String(groupId)) ||
+                   displayList.find(g => String(g.id) === String(groupId));
+      if (!target) {
+        const courseMap = {
+          cse: "Computer Science Engineering",
+          aiml: "Artificial Intelligence & Machine Learning",
+          eee: "Electrical and Electronics Engineering",
+          it: "Information Technology",
+          eie: "Electronics and Instrumentation Engineering"
+        };
+        const courseName = courseMap[groupId] || (String(groupId).startsWith('course_') ? String(groupId).replace('course_', '').toUpperCase() : `Course ${groupId}`);
+        target = {
+          id: groupId,
+          name: `${courseName} Course Chat`,
+          course: courseName,
+          description: `Real-time discussion room for ${courseName}`,
+          visibility: "Public",
+          owner_email: activeUser?.email || "system@campus.edu",
+          owner_name: activeUser?.fullName || activeUser?.name || "Student",
+          members: [{ name: activeUser?.fullName || activeUser?.name || 'Student', email: activeUser?.email || 'student@campus.edu', role: 'Member' }]
+        };
+        displayList.unshift(target);
+      }
+      setSelectedGroup(target);
+      if (!displayList.some(g => String(g.id) === String(target.id))) {
+        displayList.unshift(target);
       }
     } else if (displayList.length > 0 && !selectedGroup) {
       setSelectedGroup(displayList[0]);

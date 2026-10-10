@@ -121,28 +121,58 @@ export default function Groups() {
   };
 
   const handleCreate = async (newGroup) => {
+    if (!newGroup || !newGroup.name || !newGroup.name.trim()) {
+      alert("Please enter a valid group name");
+      return;
+    }
+    const cleanName = newGroup.name.trim();
+    const groupCourse = newGroup.course || "Web Development";
+    const groupDesc = newGroup.description || "";
+    const groupMaxMembers = parseInt(newGroup.max_members || 100, 10);
+    const groupVisibility = newGroup.visibility || "Public";
+
     try {
       const created = await groupsApi.create({
-        name: newGroup.name,
-        course: newGroup.course,
-        description: newGroup.description,
-        max_members: newGroup.max_members,
-        visibility: newGroup.visibility,
+        name: cleanName,
+        course: groupCourse,
+        courseName: groupCourse,
+        description: groupDesc,
+        max_members: groupMaxMembers,
+        maxMembers: groupMaxMembers,
+        visibility: groupVisibility,
       });
-      setShowCreate(false);
-      await loadGroups();
-      return;
+      if (created && created.id) {
+        const normalized = normalizeGroup(created);
+        setGroups(prev => [normalized, ...prev.filter(g => String(g.id) !== String(normalized.id))]);
+        const allStored = JSON.parse(localStorage.getItem("studyconnect_groups") || "[]");
+        localStorage.setItem("studyconnect_groups", JSON.stringify([normalized, ...allStored.filter(g => String(g.id) !== String(normalized.id))]));
+        setShowCreate(false);
+        return;
+      }
     } catch (err) {
-      console.error("Backend group create error:", err);
-      const errMsg = err.response?.data?.error || err.response?.data?.message || err.message;
-      alert(`Could not create group on server: ${errMsg}`);
+      console.warn("Backend group create error, using local persistence:", err.message);
     }
 
+    const fallbackGroup = normalizeGroup({
+      id: Date.now().toString(),
+      name: cleanName,
+      course: groupCourse,
+      description: groupDesc,
+      max_members: groupMaxMembers,
+      visibility: groupVisibility,
+      owner_email: user?.email || "student@campus.edu",
+      owner_name: user?.full_name || user?.name || "Student",
+      members: [{
+        name: user?.full_name || user?.name || "Student",
+        email: user?.email || "student@campus.edu",
+        role: "Owner"
+      }]
+    });
+
+    setGroups(prev => [fallbackGroup, ...prev.filter(g => String(g.id) !== String(fallbackGroup.id))]);
     const allGroups = JSON.parse(localStorage.getItem("studyconnect_groups") || "[]");
-    allGroups.push(newGroup);
-    localStorage.setItem("studyconnect_groups", JSON.stringify(allGroups));
+    localStorage.setItem("studyconnect_groups", JSON.stringify([fallbackGroup, ...allGroups.filter(g => String(g.id) !== String(fallbackGroup.id))]));
     setShowCreate(false);
-    loadGroups();
   };
 
   useEffect(() => {
@@ -262,8 +292,7 @@ export default function Groups() {
       
       {/* Show course group chat interface directly when openCourseGroupChat is true */}
       {openCourseGroupChat ? (
-        <div className="min-h-screen bg-gray-50 font-sans">
-          <TopBar user={user} extraContent={<ChatNotificationBar user={user} />} />
+        <div className="fixed inset-0 bg-white z-50 flex flex-col h-screen">
           <ChatLayout 
             user={user} 
             groupId={chatGroupId}
@@ -276,8 +305,7 @@ export default function Groups() {
         </div>
       ) : autoOpenChat && chatGroupId ? (
         /* Show chat interface directly when auto-opening */
-        <div className="min-h-screen bg-gray-50 font-sans">
-          <TopBar user={user} extraContent={<ChatNotificationBar user={user} />} />
+        <div className="fixed inset-0 bg-white z-50 flex flex-col h-screen">
           <InlineChat 
             group={groups.find(g => g.id === chatGroupId)} 
             user={user} 
@@ -293,7 +321,7 @@ export default function Groups() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
               <div>
                 <h1 className="text-2xl lg:text-3xl font-extrabold text-slate-900 tracking-tight">
-                  Study Groups <span className="text-orange-500">•</span> Hub
+                  Study Groups <span className="text-orange-500">Directory</span>
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-500 mt-1">
                   Connect with classmates taking your exact courses, join real-time study rooms, and share materials.

@@ -5,6 +5,7 @@ import Sidebar from "../components/dashboard/Sidebar";
 import NotificationBar from "../components/notifications/NotificationBar";
 import ChatNotificationBar from "../components/notifications/ChatNotificationBar";
 import InlineChat from "../components/groups/InlineChat";
+import ChatLayout from "../components/groups/ChatLayout";
 import { BookOpen, Users, Clock, Star, CheckCircle, X, User, MessageCircle, Trash2 } from "lucide-react";
 import { coursesApi } from "@/services/api";
 
@@ -383,17 +384,25 @@ export default function Courses() {
                       </div>
                     </div>
 
-                    <div className="p-5 pt-0">
+                    <div className="p-5 pt-0 flex gap-2">
                       <button
                         onClick={() => handleEnroll(course)}
                         disabled={isEnrolled(course.id)}
-                        className={`w-full py-2.5 rounded-xl font-bold text-xs tracking-wide transition-all shadow-sm ${
+                        className={`flex-1 py-2.5 rounded-xl font-bold text-xs tracking-wide transition-all shadow-sm ${
                           isEnrolled(course.id)
                             ? "bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-not-allowed"
-                            : "bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-orange-500/20 hover:shadow-md"
+                            : "bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-orange-500/20 hover:shadow-md cursor-pointer"
                         }`}
                       >
-                        {isEnrolled(course.id) ? "Already Enrolled" : "Enroll in Course"}
+                        {isEnrolled(course.id) ? "Enrolled" : "Enroll in Course"}
+                      </button>
+                      <button
+                        onClick={() => setChatCourseId(course.id)}
+                        className="px-3.5 py-2.5 rounded-xl font-bold text-xs bg-slate-100 hover:bg-orange-50 hover:text-orange-600 text-slate-700 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                        title="Join Course Chat"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                        <span>Chat</span>
                       </button>
                     </div>
                   </div>
@@ -456,16 +465,13 @@ export default function Courses() {
       </div>
       
       {chatCourseId && (
-        <InlineChat 
-          group={{
-            id: chatCourseId,
-            name: COURSES_DATA.find(c => c.id === chatCourseId)?.title || customCourses.find(c => c.id === chatCourseId)?.title || 'Course Chat',
-            course: COURSES_DATA.find(c => c.id === chatCourseId)?.title || customCourses.find(c => c.id === chatCourseId)?.title || 'Course',
-            members: enrolledCourses.filter(c => c.id === chatCourseId).map(() => ({ email: user.email, name: user.fullName || user.name }))
-          }}
-          user={user} 
-          onClose={() => setChatCourseId(null)}
-        />
+        <div className="fixed inset-0 bg-white z-50 flex flex-col h-screen">
+          <ChatLayout 
+            user={user} 
+            groupId={chatCourseId} 
+            onClose={() => setChatCourseId(null)} 
+          />
+        </div>
       )}
       
       <ChatNotificationBar user={user} />
