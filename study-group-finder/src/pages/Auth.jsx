@@ -18,19 +18,9 @@ export default function Auth() {
 
   // If already logged in with valid token, automatically redirect to Dashboard
   useEffect(() => {
-    const stored = localStorage.getItem("studyconnect_user");
-    const token = localStorage.getItem("studyconnect_token");
-    if (stored && token) {
-      try {
-        const u = JSON.parse(stored);
-        if (u && (u.email || u.id)) {
-          console.log("Active session detected, redirecting to Dashboard...");
-          window.location.href = createPageUrl("Dashboard");
-        }
-      } catch (e) {
-        console.warn("Invalid user storage:", e);
-      }
-    }
+    // Purge any stale persistent tokens from localStorage
+    localStorage.removeItem("studyconnect_token");
+    localStorage.removeItem("studyconnect_user");
   }, []);
 
   const handleSignUp = async ({ name, email, password, university, passing_year, passing_gpa }) => {

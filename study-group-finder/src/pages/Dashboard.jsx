@@ -5,7 +5,7 @@ import TopBar from "../components/dashboard/TopBar";
 import Sidebar from "../components/dashboard/Sidebar";
 import NotificationBar from "../components/notifications/NotificationBar";
 import ChatNotificationBar from "../components/notifications/ChatNotificationBar";
-import { Users } from "lucide-react";
+import { Users, BookOpen } from "lucide-react";
 import { groupsApi } from "@/services/api";
 
 export default function Dashboard() {
@@ -79,8 +79,8 @@ export default function Dashboard() {
       userData = JSON.parse(sessionStorage.getItem("studyconnect_user"));
     } catch (e) {}
 
-    if (!userData) {
-      window.location.href = createPageUrl("Auth");
+    if (!userData || (!userData.email && !userData.id)) {
+      navigate('/Auth', { replace: true });
       return;
     }
     if (!sessionStorage.getItem("studyconnect_token")) {
@@ -271,12 +271,12 @@ export default function Dashboard() {
                       <div key={g.id} className="flex items-center justify-between p-3.5 bg-slate-50/70 hover:bg-slate-100/70 border border-slate-100 rounded-xl transition-all">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center text-white font-bold shadow-xs">
-                            {g.name[0]}
+                            {(g?.name && g.name.length > 0) ? g.name[0] : 'G'}
                           </div>
                           <div>
-                            <p className="font-bold text-sm text-slate-800 leading-snug">{g.name}</p>
+                            <p className="font-bold text-sm text-slate-800 leading-snug">{g?.name || 'Study Group'}</p>
                             <p className="text-xs text-slate-400">
-                              {g.course || g.courseName} • {(g.members || []).length} members
+                              {g.course || g.courseName || 'General'} • {(g.members || []).length} members
                             </p>
                           </div>
                         </div>

@@ -9,7 +9,13 @@ import { format, isSameDay, parseISO, startOfMonth, endOfMonth, eachDayOfInterva
 import { sessionsApi } from "@/services/api";
 
 export default function Sessions() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem("studyconnect_user") || "null");
+    } catch (e) {
+      return null;
+    }
+  });
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [sessions, setSessions] = useState([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -17,7 +23,7 @@ export default function Sessions() {
 
   useEffect(() => {
     const stored = sessionStorage.getItem("studyconnect_user");
-    if (!stored || !sessionStorage.getItem("studyconnect_token")) { 
+    if (!stored) { 
       window.location.href = createPageUrl("Auth"); 
       return; 
     }

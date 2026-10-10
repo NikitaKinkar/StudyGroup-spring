@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
+import ErrorBoundary from './components/common/ErrorBoundary.jsx'
 import './index.css'
 
 // Fix for sockjs-client global variable issue
@@ -15,7 +16,9 @@ const rootElement = document.getElementById('root');
 if (rootElement) {
   console.log('main.jsx: Root element found, creating React root.');
   ReactDOM.createRoot(rootElement).render(
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   );
 } else {
   console.error('main.jsx: Root element with ID "root" not found in the document.');

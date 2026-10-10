@@ -117,7 +117,7 @@ export default function NotificationBar({ user }) {
       }
 
       const stored = JSON.parse(localStorage.getItem("studyconnect_notifications") || "[]");
-      const userNotifications = stored.filter(n => n.recipient_email === user.email);
+      const userNotifications = stored.filter(n => n.recipient_email === user?.email);
       setNotifications(userNotifications);
       const unread = userNotifications.filter(n => !n.read).length;
       setUnreadCount(unread);

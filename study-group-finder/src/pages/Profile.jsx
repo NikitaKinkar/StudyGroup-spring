@@ -7,12 +7,18 @@ import ProfileEdit from "../components/auth/ProfileEdit";
 import { User, Mail, GraduationCap, Calendar, Award, ShieldCheck, Edit3, Sparkles } from "lucide-react";
 
 export default function Profile() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem("studyconnect_user") || "null");
+    } catch (e) {
+      return null;
+    }
+  });
   const [showEdit, setShowEdit] = useState(false);
 
   useEffect(() => {
     const stored = sessionStorage.getItem("studyconnect_user");
-    if (!stored || !sessionStorage.getItem("studyconnect_token")) {
+    if (!stored) {
       window.location.href = createPageUrl("Auth");
       return;
     }

@@ -46,9 +46,20 @@ const AuthenticatedApp = () => {
     }
   }
 
+  const checkValidUser = () => {
+    try {
+      const raw = sessionStorage.getItem("studyconnect_user");
+      if (!raw || raw === "null" || raw === "undefined") return false;
+      const parsed = JSON.parse(raw);
+      return Boolean(parsed && (parsed.email || parsed.id));
+    } catch {
+      return false;
+    }
+  };
+
   const hasUser = Boolean(
-    (isAuthenticated && user) ||
-    Boolean(sessionStorage.getItem("studyconnect_user"))
+    (isAuthenticated && user && (user.email || user.id)) ||
+    checkValidUser()
   );
 
   console.log('App.jsx: Rendering main app routes, hasUser:', hasUser);
